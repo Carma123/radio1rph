@@ -1,0 +1,84 @@
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api"; // your axios instance
+import "./AdminRegister.css";
+
+const AdminRegister = () => {
+  const navigate = useNavigate();
+  const nameRef = useRef(null);
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    nameRef.current.focus();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!name || !email || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    try {
+      await api.registerAdmin({ name, email, password });
+      setSuccess("Registration successful! Redirecting to login...");
+      setTimeout(() => navigate("/admin-login"), 1500);
+    } catch (err) {
+      setError(err.response?.data?.message || "Registration failed.");
+    }
+  };
+
+  return (
+    <div className="register-container">
+      <h1 tabIndex="0">Admin Registration</h1>
+
+      <form onSubmit={handleSubmit} className="register-form">
+        {error && <p className="error" role="alert">{error}</p>}
+        {success && <p className="success" role="status">{success}</p>}
+
+        <label htmlFor="name">Name:</label>
+        <input
+          ref={nameRef}
+          type="text"
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter your name"
+          required
+        />
+
+        <label htmlFor="email">Email:</label>
+        <input
+          type="email"
+          id="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter your email"
+          required
+        />
+
+        <label htmlFor="password">Password:</label>
+        <input
+          type="password"
+          id="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Enter your password"
+          required
+        />
+
+        <button type="submit">Register</button>
+      </form>
+    </div>
+  );
+};
+
+export default AdminRegister;

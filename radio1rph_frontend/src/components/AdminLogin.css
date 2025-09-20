@@ -1,0 +1,83 @@
+/* AdminLogin.css */
+
+.login-container {
+  max-width: 400px;
+  width: 90%;
+  margin: 5% auto;
+  padding: 2rem;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  background-color: #f9f9f9;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.login-container h1 {
+  text-align: center;
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #111; /* higher contrast */
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-form label {
+  font-weight: bold;
+  color: #111; /* higher contrast */
+}
+
+.login-form input {
+  padding: 0.75rem;
+  border: 1px solid #888;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-form input:focus {
+  outline: 3px solid #005fcc;
+  outline-offset: 2px;
+  border-color: #005fcc;
+  box-shadow: 0 0 5px rgba(0, 95, 204, 0.5);
+}
+
+.login-btn {
+  padding: 0.75rem;
+  font-size: 1.1rem;
+  background-color: #005fcc;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.login-btn:hover,
+.login-btn:focus {
+  background-color: #004bb5;
+  outline: 3px solid #222; /* visible focus */
+}
+
+.error {
+  color: #d8000c;
+  font-weight: bold;
+}
+
+.success {
+  color: #007700;
+  font-weight: bold;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .login-container {
+    padding: 1.5rem;
+  }
+
+  .login-btn {
+    font-size: 1rem;
+  }
+}
