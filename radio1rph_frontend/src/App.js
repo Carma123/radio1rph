@@ -1,7 +1,10 @@
+// src/App.js
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import api from "./services/api";
 
 // Admin components
+import MyEOIs from "./components/MyEOIs";
 import VolunteerList from "./components/VolunteerList";
 import VolunteerForm from "./components/VolunteerForm";
 import TrainingsList from "./components/TrainingsList";
@@ -11,8 +14,14 @@ import AdminRegister from "./components/AdminRegister";
 import Navbar from "./components/Navbar";
 import QualificationsList from "./components/QualificationsList";
 import AddQualification from "./components/AddQualification";
-import VolunteerAttendance from "./components/VolunteerAttendance";
-import EOIList from "./components/EOIList"; // <-- NEW component
+import VolunteerAttendance from "./components/VolunteerAttendance"; // admin view (everyone)
+import MyAttendance from "./components/MyAttendance";               // volunteer self-only view
+import EOIList from "./components/EOIList";
+import AdminCoursePanel from "./components/AdminCoursePanel";
+import TrainingResultsAdmin from "./components/TrainingResultsAdmin";
+
+// 🔐 Admin password reset (single page only)
+import AdminResetPassword from "./components/AdminResetPassword";
 
 // Volunteer components
 import VolunteerLogin from "./components/VolunteerLogin";
@@ -20,114 +29,190 @@ import VolunteerRegister from "./components/VolunteerRegister";
 import VolunteerDashboard from "./components/VolunteerDashboard";
 import VolunteerProfile from "./components/VolunteerProfile";
 
+// 🔐 Volunteer password reset (forgot + reset)
+import VolunteerForgotPassword from "./components/VolunteerForgotPassword";
+import VolunteerResetPassword from "./components/VolunteerResetPassword";
+
+// NEW: volunteer add/edit form
+import VolunteerAddQualification from "./components/VolunteerAddQualification";
+
+/** Safely parse JSON from localStorage */
+const safeParse = (raw, fallback = null) => {
+  try {
+    if (!raw || raw === "undefined" || raw === "null") return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+};
+
 function App() {
   const [volunteer, setVolunteer] = useState(null);
   const [adminLoggedIn, setAdminLoggedIn] = useState(false);
 
-  // On page load, check if a volunteer or admin is already logged in
+  // Rehydrate axios Authorization header on first load (in case of refresh)
   useEffect(() => {
-    const storedVolunteer = localStorage.getItem("volunteer");
-    if (storedVolunteer) {
-      try {
-        const parsedVolunteer = JSON.parse(storedVolunteer);
-        if (parsedVolunteer?.volunteer_id) setVolunteer(parsedVolunteer);
-      } catch (err) {
-        console.error("Failed to parse volunteer from localStorage:", err);
-        localStorage.removeItem("volunteer"); // clean invalid value
-      }
-    }
-
-    const storedAdmin = localStorage.getItem("admin");
-    if (storedAdmin) {
-      try {
-        JSON.parse(storedAdmin); // we just check if valid JSON
-        setAdminLoggedIn(true);
-      } catch (err) {
-        console.error("Failed to parse admin from localStorage:", err);
-        localStorage.removeItem("admin"); // clean invalid value
-      }
-    }
+    api.auth.setFromStorage();
   }, []);
 
-  // Volunteer login handler
+  // Boot-up: detect existing sessions
+  useEffect(() => {
+    // Volunteer
+    const v = safeParse(localStorage.getItem("volunteer"));
+    if (v?.volunteer_id) {
+      setVolunteer(v);
+    } else {
+      localStorage.removeItem("volunteer");
+      setVolunteer(null);
+    }
+
+    // Admin: require both an admin object and an access token
+    const a = safeParse(localStorage.getItem("admin"));
+    const access = localStorage.getItem("access_token");
+    setAdminLoggedIn(!!a && !!access);
+  }, []);
+
+  // Keep state in sync across tabs (and when tokens are cleared by refresh failures)
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (["admin", "access_token", "refresh_token"].includes(e.key)) {
+        const a = safeParse(localStorage.getItem("admin"));
+        const access = localStorage.getItem("access_token");
+        setAdminLoggedIn(!!a && !!access);
+      }
+      if (e.key === "volunteer") {
+        const v = safeParse(localStorage.getItem("volunteer"));
+        setVolunteer(v?.volunteer_id ? v : null);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // Volunteer login/logout
   const handleVolunteerLogin = (volunteerData) => {
-    localStorage.setItem("volunteer", JSON.stringify(volunteerData));
-    setVolunteer(volunteerData);
+    const normalized = {
+      volunteer_id: volunteerData.volunteer_id,
+      name: volunteerData.name,
+      email: volunteerData.email,
+      emergency_contact: volunteerData.emergency_contact ?? null,
+    };
+    localStorage.setItem("volunteer", JSON.stringify(normalized));
+    setVolunteer(normalized);
   };
 
-  // Volunteer logout handler
   const handleVolunteerLogout = () => {
+    // NOTE: We do NOT clear JWT tokens here to avoid logging out an active admin.
     localStorage.removeItem("volunteer");
     setVolunteer(null);
   };
 
-  // Admin login/logout handlers
-  const handleAdminLogin = (adminData) => {
-    localStorage.setItem("admin", JSON.stringify(adminData));
+  // Admin login/logout
+  const handleAdminLogin = () => {
     setAdminLoggedIn(true);
   };
 
   const handleAdminLogout = () => {
-    localStorage.removeItem("admin");
+    api.auth.logout(); // clears tokens + removes "admin"
     setAdminLoggedIn(false);
   };
 
+  const AdminGuard = (component) =>
+    adminLoggedIn ? component : <Navigate to="/admin-login" />;
+
+  const VolunteerGuard = (component) =>
+    volunteer ? component : <Navigate to="/volunteer-login" />;
+
   return (
     <Router>
-      {/* Admin Navbar */}
+      {/* Admin Navbar (only when admin is logged in) */}
       {adminLoggedIn && <Navbar onLogout={handleAdminLogout} />}
 
       <Routes>
-        {/* -------------------- Admin Routes -------------------- */}
+        {/* -------------------- Admin Auth Routes -------------------- */}
         <Route path="/admin-login" element={<AdminLogin onLogin={handleAdminLogin} />} />
         <Route path="/admin-register" element={<AdminRegister />} />
-        <Route
-          path="/volunteers"
-          element={adminLoggedIn ? <VolunteerList /> : <Navigate to="/admin-login" />}
-        />
-        <Route
-          path="/volunteers/add"
-          element={adminLoggedIn ? <VolunteerForm /> : <Navigate to="/admin-login" />}
-        />
+
+        {/* 🔐 Admin password reset (no separate "forgot" page) */}
+        <Route path="/admin-reset-password" element={<AdminResetPassword />} />
+
+        {/* -------------------- Admin Protected Routes -------------------- */}
+        <Route path="/volunteers" element={AdminGuard(<VolunteerList />)} />
+        <Route path="/volunteers/add" element={AdminGuard(<VolunteerForm />)} />
+
+        {/* Admin attendance console (everyone) */}
+        <Route path="/admin/attendance" element={AdminGuard(<VolunteerAttendance />)} />
+
+        {/* Mixed attendance route:
+            - Admins: show admin console (everyone)
+            - Volunteers: show self-only page */}
         <Route
           path="/volunteers/:volunteerId/attendance"
-          element={adminLoggedIn ? <VolunteerAttendance /> : <Navigate to="/admin-login" />}
-        />
-        <Route
-          path="/trainings"
-          element={adminLoggedIn ? <TrainingsList /> : <Navigate to="/admin-login" />}
-        />
-        <Route
-          path="/trainings/add"
-          element={adminLoggedIn ? <TrainingForm /> : <Navigate to="/admin-login" />}
-        />
-        <Route
-          path="/qualifications"
           element={
-            adminLoggedIn ? (
-              <VolunteerList showQualificationsLink={true} />
-            ) : (
-              <Navigate to="/admin-login" />
-            )
+            adminLoggedIn
+              ? AdminGuard(<VolunteerAttendance />)
+              : VolunteerGuard(<MyAttendance />)
           }
         />
+
+        <Route path="/trainings" element={AdminGuard(<TrainingsList />)} />
+        <Route path="/trainings/add" element={AdminGuard(<TrainingForm />)} />
+
+        {/* Qualifications entry point: list volunteers with link to their quals (admin area) */}
         <Route
-          path="/volunteers/:volunteerId/qualifications"
-          element={adminLoggedIn ? <QualificationsList /> : <Navigate to="/admin-login" />}
-        />
-        <Route
-          path="/qualifications/add"
-          element={adminLoggedIn ? <AddQualification /> : <Navigate to="/admin-login" />}
-        />
-        <Route
-          path="/qualifications/edit"
-          element={adminLoggedIn ? <AddQualification /> : <Navigate to="/admin-login" />}
+          path="/qualifications"
+          element={AdminGuard(<VolunteerList showQualificationsLink={true} />)}
         />
 
-        {/* -------------------- NEW EOI ROUTE -------------------- */}
+        {/* View a volunteer's qualifications (admin or that volunteer) */}
         <Route
-          path="/admin/eois"
-          element={adminLoggedIn ? <EOIList /> : <Navigate to="/admin-login" />}
+          path="/volunteers/:volunteerId/qualifications"
+          element={
+            adminLoggedIn
+              ? AdminGuard(<QualificationsList />)
+              : VolunteerGuard(<QualificationsList />)
+          }
+        />
+
+        {/* Admin-only quick add/edit (back-compat) */}
+        <Route path="/qualifications/add" element={AdminGuard(<AddQualification />)} />
+        <Route path="/qualifications/edit" element={AdminGuard(<AddQualification />)} />
+
+        {/* Volunteer-friendly Add/Edit (no id in URL, volunteers only) */}
+        <Route
+        path="/volunteer/qualifications/add"
+        element={VolunteerGuard(<VolunteerAddQualification />)}
+        />
+
+        {/* Dual route: if admin hits it, show admin form; if volunteer hits it, show volunteer form */}
+        <Route
+        path="/volunteers/:volunteerId/qualifications/add"
+        element={
+          adminLoggedIn
+            ? AdminGuard(<AddQualification />)
+            : VolunteerGuard(<VolunteerAddQualification />)
+        }
+        />
+
+
+
+        {/* EOIs (Admin) */}
+        <Route path="/admin/eois" element={AdminGuard(<EOIList />)} />
+
+        {/* Admin Course Panel */}
+        <Route
+          path="/admin/trainings/:trainingId/panel"
+          element={AdminGuard(<AdminCoursePanel />)}
+        />
+
+        {/* NEW: Training Results (Admin) */}
+        <Route
+          path="/admin/trainings/:trainingId/results"
+          element={AdminGuard(<TrainingResultsAdmin />)}
+        />
+        <Route
+          path="/admin/training-results"
+          element={AdminGuard(<TrainingResultsAdmin />)}
         />
 
         {/* -------------------- Volunteer Routes -------------------- */}
@@ -136,34 +221,41 @@ function App() {
           element={<VolunteerLogin onLogin={handleVolunteerLogin} />}
         />
         <Route path="/volunteer-register" element={<VolunteerRegister />} />
+
+        {/* 🔐 Volunteer password reset flow */}
+        <Route path="/volunteer-forgot-password" element={<VolunteerForgotPassword />} />
+        <Route path="/volunteer-reset-password" element={<VolunteerResetPassword />} />
+
         <Route
           path="/volunteer/dashboard"
-          element={
-            volunteer ? (
-              <VolunteerDashboard volunteer={volunteer} onLogout={handleVolunteerLogout} />
-            ) : (
-              <Navigate to="/volunteer-login" />
-            )
-          }
+          element={VolunteerGuard(
+            <VolunteerDashboard volunteer={volunteer} onLogout={handleVolunteerLogout} />
+          )}
         />
         <Route
           path="/volunteer/profile"
+          element={VolunteerGuard(
+            <VolunteerProfile volunteer={volunteer} onLogout={handleVolunteerLogout} />
+          )}
+        />
+        <Route path="/volunteer/my-eois" element={VolunteerGuard(<MyEOIs />)} />
+
+        {/* -------------------- Smart landings -------------------- */}
+        <Route
+          path="/"
           element={
-            volunteer ? (
-              <VolunteerProfile volunteer={volunteer} onLogout={handleVolunteerLogout} />
+            adminLoggedIn ? (
+              <Navigate to="/trainings" />
+            ) : volunteer ? (
+              <Navigate to="/volunteer/dashboard" />
             ) : (
               <Navigate to="/volunteer-login" />
             )
           }
         />
 
-        {/* -------------------- Default Route -------------------- */}
-        <Route
-          path="*"
-          element={
-            volunteer ? <Navigate to="/volunteer/dashboard" /> : <Navigate to="/volunteer-login" />
-          }
-        />
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

@@ -1,43 +1,80 @@
-import React, { useState } from "react";
+// src/components/VolunteerProfile.js
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import icon from "./icon.png";
 import "./VolunteerDashboard.css";
 
+const safeParse = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 const VolunteerProfile = () => {
   const navigate = useNavigate();
-  const storedVolunteer = JSON.parse(localStorage.getItem("volunteer"));
+
+  const storedVolunteer = useMemo(() => safeParse("volunteer"), []);
+  const volunteerId = storedVolunteer?.id ?? storedVolunteer?.volunteer_id ?? null;
+
   const [formData, setFormData] = useState({
     phone: storedVolunteer?.phone || "",
     emergency_contact: storedVolunteer?.emergency_contact || "",
     training_goals: storedVolunteer?.training_goals || "",
   });
-  const [message, setMessage] = useState("");
 
-  // If no volunteer is logged in, redirect
-  if (!storedVolunteer) {
-    navigate("/volunteer-login");
-    return null;
-  }
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!storedVolunteer) {
+      navigate("/volunteer-login", { replace: true });
+    }
+  }, [storedVolunteer, navigate]);
 
   const handleChange = (e) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   const handleSave = async () => {
+    setMessage("");
+    if (!volunteerId) {
+      setMessage("Error: Missing volunteer id. Please log in again.");
+      console.error("Update blocked: volunteer id is missing.");
+      return;
+    }
+
     try {
-      // ✅ Use `id` instead of volunteer_id
-      const response = await api.updateVolunteer(storedVolunteer.id, formData);
+      setLoading(true);
+      const response = await api.updateVolunteer(volunteerId, formData);
 
-      // ✅ Keep localStorage in sync with updated volunteer data
-      const updatedVolunteer = { ...storedVolunteer, ...formData };
+      // Prefer server-truth if returned, else merge our form data
+      const updatedVolunteer =
+        response?.data && typeof response.data === "object"
+          ? { ...storedVolunteer, ...response.data }
+          : { ...storedVolunteer, ...formData, id: volunteerId };
+
       localStorage.setItem("volunteer", JSON.stringify(updatedVolunteer));
-
       setMessage("Profile updated successfully!");
     } catch (err) {
-      console.error(err);
-      setMessage("Error updating profile.");
+      console.error("Update failed:", err);
+      const status = err?.response?.status;
+      if (status === 405) {
+        setMessage("Error updating profile. (405: Method Not Allowed on backend)");
+      } else if (status === 404) {
+        setMessage("Error updating profile. (404: Volunteer not found)");
+      } else {
+        setMessage("Error updating profile.");
+      }
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (!storedVolunteer) return null; // allow redirect to happen
 
   return (
     <div className="dashboard-container">
@@ -88,11 +125,18 @@ const VolunteerProfile = () => {
               Profile Information
             </h2>
 
+            {/* Read-only basics for clarity */}
+            <div style={{ marginBottom: "1rem", fontSize: "0.95rem", color: "#555" }}>
+              <div><strong>Name:</strong> {storedVolunteer?.name || "-"}</div>
+              <div><strong>Email:</strong> {storedVolunteer?.email || "-"}</div>
+              <div><strong>Volunteer ID:</strong> {volunteerId ?? "-"}</div>
+            </div>
+
             {message && (
               <p
                 role="alert"
                 style={{
-                  color: message.includes("Error") ? "#dc3545" : "#28a745",
+                  color: message.startsWith("Error") ? "#dc3545" : "#28a745",
                   textAlign: "center",
                   marginBottom: "1rem",
                   fontWeight: "bold",
@@ -118,6 +162,7 @@ const VolunteerProfile = () => {
                   onChange={handleChange}
                   placeholder="Enter your phone number"
                   aria-required="true"
+                  disabled={loading}
                   style={{
                     padding: "12px",
                     borderRadius: "8px",
@@ -141,6 +186,7 @@ const VolunteerProfile = () => {
                   onChange={handleChange}
                   placeholder="Enter emergency contact"
                   aria-required="true"
+                  disabled={loading}
                   style={{
                     padding: "12px",
                     borderRadius: "8px",
@@ -164,6 +210,7 @@ const VolunteerProfile = () => {
                   onChange={handleChange}
                   placeholder="Enter your training goals"
                   aria-required="false"
+                  disabled={loading}
                   style={{
                     padding: "12px",
                     borderRadius: "8px",
@@ -179,30 +226,33 @@ const VolunteerProfile = () => {
 
               <button
                 type="submit"
+                disabled={loading}
                 style={{
                   width: "100%",
                   padding: "14px",
                   marginTop: "0.5rem",
-                  backgroundColor: "#007BFF",
+                  backgroundColor: loading ? "#6c757d" : "#007BFF",
                   color: "#fff",
                   border: "none",
                   borderRadius: "8px",
-                  cursor: "pointer",
+                  cursor: loading ? "not-allowed" : "pointer",
                   fontSize: "16px",
                   fontWeight: "bold",
                   boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
                   transition: "background-color 0.3s, transform 0.2s",
                 }}
                 onMouseOver={(e) => {
-                  e.target.style.backgroundColor = "#0056b3";
-                  e.target.style.transform = "scale(1.03)";
+                  if (!loading) {
+                    e.target.style.backgroundColor = "#0056b3";
+                    e.target.style.transform = "scale(1.03)";
+                  }
                 }}
                 onMouseOut={(e) => {
-                  e.target.style.backgroundColor = "#007BFF";
+                  e.target.style.backgroundColor = loading ? "#6c757d" : "#007BFF";
                   e.target.style.transform = "scale(1)";
                 }}
               >
-                Save Changes
+                {loading ? "Saving..." : "Save Changes"}
               </button>
             </form>
           </section>

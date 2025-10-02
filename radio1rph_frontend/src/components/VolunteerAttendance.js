@@ -10,7 +10,21 @@ const VolunteerAttendance = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Helper: Calculate duration in h/m
+  // --- CSV export date controls ---
+  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const [exportDate, setExportDate] = useState(todayStr);
+
+  const isToday = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  };
+
   const getDuration = (clockIn, clockOut) => {
     if (!clockIn || !clockOut) return "-";
     const diffMs = new Date(clockOut) - new Date(clockIn);
@@ -19,20 +33,35 @@ const VolunteerAttendance = () => {
     return `${diffHours}h ${diffMinutes}m`;
   };
 
-  // Fetch volunteers + today's attendance
+  const pickCurrentForToday = (rows = []) => {
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    const todayRows = rows.filter((r) => isToday(r.clock_in) || isToday(r.clock_out));
+    if (todayRows.length === 0) return null;
+    const open = todayRows.find((r) => r.clock_in && !r.clock_out);
+    if (open) return open;
+    return [...todayRows].sort(
+      (a, b) => new Date(b.clock_in || 0) - new Date(a.clock_in || 0)
+    )[0];
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const volunteerRes = await api.getVolunteers();
-      const vols = volunteerRes.data;
+      const rawVols = volunteerRes.data || [];
+      const vols = rawVols.map((v) => ({ ...v, id: v.id ?? v.volunteer_id }));
 
       const attendanceData = {};
+      const histories = {};
       await Promise.all(
         vols.map(async (v) => {
           try {
-            const res = await api.getTodayAttendanceByVolunteer(v.id);
-            attendanceData[v.id] = res.data[0] || null;
+            const res = await api.getAttendanceByVolunteer(v.id);
+            const rows = res.data || [];
+            histories[v.id] = rows;
+            attendanceData[v.id] = pickCurrentForToday(rows);
           } catch {
+            histories[v.id] = [];
             attendanceData[v.id] = null;
           }
         })
@@ -40,6 +69,7 @@ const VolunteerAttendance = () => {
 
       setVolunteers(vols);
       setAttendanceMap(attendanceData);
+      setHistoryMap(histories);
       setError("");
     } catch (err) {
       console.error(err);
@@ -54,13 +84,25 @@ const VolunteerAttendance = () => {
   }, []);
 
   const handleClockIn = async (volunteerId) => {
+    if (!volunteerId) {
+      setError("Invalid volunteer id for clock in.");
+      return;
+    }
     setAttendanceMap((prev) => ({
       ...prev,
-      [volunteerId]: { ...prev[volunteerId], clock_in: new Date().toISOString() },
+      [volunteerId]: {
+        ...(prev[volunteerId] || {}),
+        clock_in: new Date().toISOString(),
+        clock_out: null,
+      },
     }));
 
     try {
       await api.clockIn(volunteerId);
+      const res = await api.getAttendanceByVolunteer(volunteerId);
+      const rows = res.data || [];
+      setHistoryMap((p) => ({ ...p, [volunteerId]: rows }));
+      setAttendanceMap((p) => ({ ...p, [volunteerId]: pickCurrentForToday(rows) }));
     } catch (err) {
       console.error(err.response?.data || err);
       setError(err.response?.data?.error || "Failed to clock in.");
@@ -69,13 +111,25 @@ const VolunteerAttendance = () => {
   };
 
   const handleClockOut = async (volunteerId) => {
+    if (!volunteerId) {
+      setError("Invalid volunteer id for clock out.");
+      return;
+    }
+
     setAttendanceMap((prev) => ({
       ...prev,
-      [volunteerId]: { ...prev[volunteerId], clock_out: new Date().toISOString() },
+      [volunteerId]: {
+        ...(prev[volunteerId] || {}),
+        clock_out: new Date().toISOString(),
+      },
     }));
 
     try {
       await api.clockOut(volunteerId);
+      const res = await api.getAttendanceByVolunteer(volunteerId);
+      const rows = res.data || [];
+      setHistoryMap((p) => ({ ...p, [volunteerId]: rows }));
+      setAttendanceMap((p) => ({ ...p, [volunteerId]: pickCurrentForToday(rows) }));
     } catch (err) {
       console.error(err.response?.data || err);
       setError(err.response?.data?.error || "Failed to clock out.");
@@ -87,7 +141,7 @@ const VolunteerAttendance = () => {
     if (!expanded[volunteerId]) {
       try {
         const res = await api.getAttendanceByVolunteer(volunteerId);
-        setHistoryMap((prev) => ({ ...prev, [volunteerId]: res.data }));
+        setHistoryMap((prev) => ({ ...prev, [volunteerId]: res.data || [] }));
         setExpanded((prev) => ({ ...prev, [volunteerId]: true }));
       } catch (err) {
         console.error(err);
@@ -107,6 +161,7 @@ const VolunteerAttendance = () => {
       await api.deleteAllAttendance();
       setAttendanceMap({});
       setHistoryMap({});
+      await fetchData();
       alert("✅ All attendance records have been deleted!");
     } catch (err) {
       console.error(err);
@@ -116,27 +171,57 @@ const VolunteerAttendance = () => {
 
   return (
     <main style={{ padding: "1rem", maxWidth: "1000px", margin: "0 auto" }}>
-      <h1 style={{ fontSize: "1.8rem", marginBottom: "1rem" }}>
+      <h1 style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>
         Volunteer Attendance (Admin)
       </h1>
 
-      {/* Delete All Button */}
-      <button
-        onClick={handleDeleteAll}
-        style={{
-          marginBottom: "1rem",
-          backgroundColor: "#b92b17",
-          color: "#fff",
-          padding: "0.5rem 1rem",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-          fontSize: "1rem",
-        }}
-        aria-label="Delete all attendance records"
-      >
-        Delete All Attendance Records
-      </button>
+      {/* --- Toolbar: date picker, download CSV, delete all --- */}
+      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ fontWeight: 600 }}>Export date:</span>
+          <input
+            type="date"
+            value={exportDate}
+            onChange={(e) => setExportDate(e.target.value)}
+            style={{ padding: "0.4rem", border: "1px solid #ccc", borderRadius: "4px" }}
+          />
+        </label>
+
+        <a
+          href={api.getAttendanceCsvUrl(exportDate || todayStr)}
+          download={`attendance_${exportDate || todayStr}.csv`}
+          style={{
+            backgroundColor: "#2e7d32",
+            color: "#fff",
+            padding: "0.5rem 1rem",
+            borderRadius: "4px",
+            textDecoration: "none",
+            display: "inline-block",
+          }}
+          aria-label="Download attendance CSV"
+          title="Download attendance CSV"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Download CSV
+        </a>
+
+        <button
+          onClick={handleDeleteAll}
+          style={{
+            backgroundColor: "#b92b17",
+            color: "#fff",
+            padding: "0.5rem 1rem",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "1rem",
+          }}
+          aria-label="Delete all attendance records"
+        >
+          Delete All Attendance Records
+        </button>
+      </div>
 
       {loading ? (
         <p>Loading...</p>
@@ -164,9 +249,10 @@ const VolunteerAttendance = () => {
             </thead>
             <tbody>
               {volunteers.map((v, index) => {
-                const attendance = attendanceMap[v.id];
+                const id = v.id;
+                const attendance = attendanceMap[id];
                 return (
-                  <React.Fragment key={v.id}>
+                  <React.Fragment key={id}>
                     <tr
                       style={{
                         backgroundColor: index % 2 === 0 ? "#fff" : "#f9f9f9",
@@ -192,34 +278,33 @@ const VolunteerAttendance = () => {
                       <td style={tdStyle}>
                         <div className="action-buttons">
                           <button
-                            onClick={() => handleClockIn(v.id)}
-                            disabled={attendance?.clock_in}
+                            onClick={() => handleClockIn(id)}
+                            disabled={!!attendance?.clock_in && !attendance?.clock_out}
                             className="btn clock-in"
                             aria-label={`Clock in ${v.name}`}
                           >
                             Clock In
                           </button>
                           <button
-                            onClick={() => handleClockOut(v.id)}
-                            disabled={!attendance?.clock_in || attendance?.clock_out}
+                            onClick={() => handleClockOut(id)}
+                            disabled={!attendance?.clock_in || !!attendance?.clock_out}
                             className="btn clock-out"
                             aria-label={`Clock out ${v.name}`}
                           >
                             Clock Out
                           </button>
                           <button
-                            onClick={() => toggleHistory(v.id)}
+                            onClick={() => toggleHistory(id)}
                             className="btn history"
                             aria-label={`View attendance history for ${v.name}`}
                           >
-                            {expanded[v.id] ? "Hide History" : "View History"}
+                            {expanded[id] ? "Hide History" : "View History"}
                           </button>
                         </div>
                       </td>
                     </tr>
 
-                    {/* History row */}
-                    {expanded[v.id] && (
+                    {expanded[id] && (
                       <tr>
                         <td colSpan={6} style={{ padding: "0", border: "none" }}>
                           <div
@@ -245,7 +330,7 @@ const VolunteerAttendance = () => {
                                 </tr>
                               </thead>
                               <tbody>
-                                {historyMap[v.id]?.map((h) => (
+                                {historyMap[id]?.map((h) => (
                                   <tr key={h.id}>
                                     <td>
                                       {h.clock_in
@@ -278,14 +363,13 @@ const VolunteerAttendance = () => {
         </div>
       )}
 
-      {/* CSS */}
+      {/* inline styles block (works in CRA too, it's just a <style> tag) */}
       <style jsx>{`
         .action-buttons {
           display: flex;
           gap: 0.5rem;
           flex-wrap: wrap;
         }
-
         .btn {
           padding: 0.4rem 0.75rem;
           border-radius: 4px;
@@ -294,12 +378,10 @@ const VolunteerAttendance = () => {
           font-size: 0.85rem;
           transition: background-color 0.3s;
         }
-
         .btn:disabled {
           background-color: #ccc;
           cursor: not-allowed;
         }
-
         .clock-in {
           background-color: #004080;
           color: #fff;
@@ -307,7 +389,6 @@ const VolunteerAttendance = () => {
         .clock-in:hover:enabled {
           background-color: #0066cc;
         }
-
         .clock-out {
           background-color: #d4351c;
           color: #fff;
@@ -315,7 +396,6 @@ const VolunteerAttendance = () => {
         .clock-out:hover:enabled {
           background-color: #b92b17;
         }
-
         .history {
           background-color: #6a5acd;
           color: #fff;

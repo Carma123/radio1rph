@@ -1,9 +1,239 @@
 // src/components/VolunteerDashboard.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link, NavLink } from "react-router-dom";
 import api from "../services/api";
-import "./VolunteerDashboard.css";
 import icon from "./icon.png";
+
+/* Inline CSS injection using your requested design tokens + utilities */
+const DASHBOARD_STYLE_ID = "vtms-dashboard-styles";
+const injectStylesOnce = () => {
+  if (document.getElementById(DASHBOARD_STYLE_ID)) return;
+  const css = `
+:root {
+  --bg: #f8fafc;
+  --text: #0f172a;
+  --muted: #475569;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --focus: #2563eb;
+  --primary: #2563eb;
+  --primary-ink: #ffffff;
+  --success: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --badge-bg: #eef2ff;
+  --badge-txt: #3730a3;
+  --table-stripe: #f1f5f9;
+  --shadow: 0 10px 24px rgba(0,0,0,.08);
+}
+
+/* Page shell */
+.dashboard-container { max-width: 1200px; margin: 0 auto; padding: 16px; background: var(--bg); color: var(--text); }
+.dashboard-main { outline: none; }
+
+/* SR live */
+.sr-live, .sr-only { position: absolute; height: 1px; width: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+
+/* Navbar */
+.navbar{position:sticky;top:0;z-index:5;margin-bottom:16px}
+.navbar-inner{ background: #fff; border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow); overflow:hidden; }
+.navbar-top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px 16px}
+.navbar-brand-center{display:flex;align-items:center;gap:12px;justify-content:center;flex:1}
+.navbar-brand-center img{ height:40px;width:40px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border); box-shadow:0 4px 16px rgba(37,99,235,.18), inset 0 0 0 3px rgba(37,99,235,.06); }
+.navbar-title{font-weight:900;letter-spacing:.2px}
+.navbar-spacer{width:48px;height:48px}
+.navbar-toggle{ display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;border:1px solid var(--border); border-radius:12px;background:#fff;color:var(--text);cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06); }
+.navbar-toggle:hover{box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.navbar-toggle:active{transform:scale(.98)}
+.navbar-toggle svg{display:block;width:22px;height:22px}
+.navbar-links{ display:flex;gap:10px;list-style:none;margin:0;padding:10px 12px;justify-content:center;border-top:1px solid var(--border);background:#fff; }
+.navbar-links li{display:flex}
+.navlink{ color:var(--text);text-decoration:none;padding:10px 14px;border-radius:999px;border:1px solid var(--border); background:#fff;transition:background .15s ease, transform .05s ease; font-weight:750;line-height:1; display:inline-flex; align-items:center; gap:8px; }
+.navlink:hover{background:#f3f4f6}
+.navlink:active{transform:scale(.98)}
+.navlink.active{outline:3px solid var(--focus); outline-offset:2px}
+.logout-button{ min-height:44px;padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:#0f172a;color:#fff;cursor:pointer;font-weight:800 }
+.logout-button:hover{filter:brightness(.95)}
+.navbar-toggle:focus-visible,.navlink:focus-visible,.logout-button:focus-visible,.btn:focus-visible,.link-button:focus-visible,.link-inline:focus-visible,.eoi__title:focus{ outline:3px solid var(--focus);outline-offset:2px }
+@media (min-width:721px){.navbar-toggle{display:none} .navbar-links{display:flex !important}}
+@media (max-width:720px){ .navbar-links{display:none;padding:10px} .navbar-links.open{display:flex;flex-direction:column;align-items:stretch} .navlink,.logout-button{width:100%} }
+
+/* Skip link */
+.skip-link{ position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden; }
+.skip-link:focus{ left:16px;top:10px;width:auto;height:auto;z-index:1000;background:#111827;color:#fff;padding:8px 12px;border-radius:8px; }
+
+/* Hero */
+.dashboard-hero{ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px; padding:24px;border-radius:18px;margin-bottom:16px;background: linear-gradient(135deg, #eef4ff 0%, #ffffff 100%); border:1px solid var(--border); box-shadow: var(--shadow); }
+.hero-icon{ height:72px;width:72px;border-radius:16px;object-fit:contain;background:#fff;border:1px solid var(--border); box-shadow:0 10px 26px rgba(30,64,175,.22), inset 0 0 0 4px rgba(37,99,235,.08); }
+.hero-title{font-size:1.8rem;margin:0;text-align:center}
+.hero-sub{color:var(--muted);font-size:.95rem;margin:0;text-align:center}
+
+/* Grid (make it a consistent 2-column layout on laptops/desktops) */
+.dashboard-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;align-items:start}
+.col-6{grid-column:span 6}
+.col-12{grid-column:span 12}
+
+/* On tablets: still 2 columns */
+@media (max-width:1100px){
+  .col-6{grid-column:span 6}
+}
+
+/* On mobile: single centered column */
+@media (max-width:860px){
+  .dashboard-grid{grid-template-columns:1fr}
+  .col-6,.col-12{grid-column:1 / -1}
+  .card{max-width:560px;margin-left:auto;margin-right:auto}
+}
+
+/* Card */
+.card{ background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px;box-shadow:var(--shadow); position:relative;overflow:hidden; }
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,#93c5fd,#60a5fa);}
+.card h2{font-size:1.1rem;margin:4px 0 10px 0;display:flex;align-items:center;gap:8px}
+.card h2 img{height:22px;width:22px;object-fit:contain;border-radius:6px;background:#fff;border:1px solid var(--border)}
+.card-content ul{margin:0;padding-left:18px}
+
+/* Buttons */
+.btn{border:1px solid transparent; padding:12px 16px; border-radius:10px; cursor:pointer; transition:transform .04s ease, box-shadow .12s ease; 
+     box-shadow:0 1px 0 rgba(0,0,0,.04); min-height:44px; font-weight:800; display:inline-flex; align-items:center; gap:8px; color:#fff;}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+.btn.primary { background: var(--primary); color: #fff; }
+.btn.success { background: var(--success); color: #fff; }
+.btn.warn    { background: var(--warn);    color: #fff; }
+.btn.danger  { background: var(--danger);  color: #fff; }
+.btn.ghost   { background: #0f172a;        color: #fff; }
+.btn[disabled], .btn[aria-disabled="true"]{opacity:.65;cursor:not-allowed}
+/* NEW: block helper for small screens (bigger tap targets) */
+.btn.block { width: 100%; }
+@media (max-width: 560px) {
+  .row-actions .btn { width: 100%; }
+}
+
+/* Inline action link (WCAG-friendly; used for Certificate/Evidence) */
+.link-inline{
+  appearance:none;
+  background:none;
+  border:none;
+  color:#1d4ed8;            /* blue-700 on white: accessible */
+  text-decoration:underline;
+  font:inherit;
+  padding:.25rem .125rem;   /* increases target without pill background */
+  border-radius:6px;
+  cursor:pointer;
+}
+.link-inline:hover{ color:#1e40af; text-decoration-thickness:2px; }
+.link-inline:focus-visible{ outline:3px solid #93c5fd; outline-offset:2px; }
+
+/* Messages */
+.alert{padding:12px 14px;border-radius:12px;margin:8px 0}
+.alert-error{background:#fef2f2;color:#7F1D1D;border:1px solid #fecaca}
+
+/* Table */
+.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; }
+.eoi-table { width:100%; border-collapse: collapse; min-width: 720px; }
+.eoi-table th, .eoi-table td { text-align:left; padding:12px 14px; border-bottom:1px solid var(--border); vertical-align: middle; }
+.eoi-table thead th { font-weight:600; background:#fbfdff; }
+.eoi-table tbody tr:nth-child(odd) { background: var(--table-stripe); }
+.col-actions { width:1%; white-space:nowrap; }
+.table-hint { font-size:.9rem; color:var(--muted); padding:10px 12px; }
+
+/* Status badges */
+.status-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--badge-bg);color:var(--badge-txt);
+  border:1px solid #e2e8f0;font-weight:600;font-size:.85rem;letter-spacing:.02em;text-transform:capitalize}
+.td-status.approved  .status-badge { background:#ecfdf5; color:#065f46; border-color:#d1fae5; }
+.td-status.pending   .status-badge { background:#fefce8; color:#713f12; border-color:#fde68a; }
+.td-status.standby   .status-badge { background:#eff6ff; color:#1e40af; border-color:#bfdbfe; }
+.td-status.rejected  .status-badge { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+.td-status.cancelled .status-badge { background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+
+/* Small utilities */
+.muted { color: var(--muted); }
+.row-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.td-actions { white-space:nowrap; }
+@media (prefers-reduced-motion: reduce) { .btn { transition:none; } }
+
+/* Notices */
+.notice-list{margin:0;padding-left:18px}
+.notice-list li{margin:6px 0}
+.notice-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.badge-local { margin-left:8px; font-size:.8rem; background:#fff7ed; color:#9a3412; border:1px solid #fdba74; padding:0 8px; border-radius:999px; }
+.refresh-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+
+/* Results list (inline styling) */
+.results-list{margin:0;padding-left:18px}
+.results-list li{margin:6px 0}
+.result-badge{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #e2e8f0;font-size:.82rem;font-weight:700;text-transform:capitalize;margin-left:6px}
+.result-badge.competent{background:#ecfdf5;color:#065f46;border-color:#d1fae5}
+.result-badge.not_yet_competent{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
+.result-badge.not_assessed{background:#f1f5f9;color:#0f172a;border-color:#e2e8f0}
+.result-badge.participated{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+
+.small-links{display:inline-flex;gap:10px;margin-left:10px;align-items:baseline}
+.small-links a{color:#2563eb;text-decoration:underline}
+.small-links a:hover{text-decoration:none}
+`;
+  const tag = document.createElement("style");
+  tag.id = DASHBOARD_STYLE_ID;
+  tag.appendChild(document.createTextNode(css));
+  document.head.appendChild(tag);
+};
+
+/* ---- helpers for local fallback notices ---- */
+const daysUntil = (isoDate) => {
+  if (!isoDate) return null;
+  const today = new Date();
+  const d = new Date(isoDate);
+  const t0 = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const t1 = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const diff = (t1 - t0) / (1000 * 60 * 60 * 24);
+  return Math.round(diff);
+};
+
+/* ---- protected file opener (uses volunteer JWT) ---- */
+const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
+
+function absoluteUrl(path) {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
+async function openProtectedFile(path, suggestedName = "file") {
+  try {
+    const url = absoluteUrl(path);
+    if (!url) return;
+    const volToken = localStorage.getItem("vol_access_token");
+    const res = await fetch(url, {
+      method: "GET",
+      headers: volToken ? { Authorization: `Bearer ${volToken}` } : {},
+      credentials: "omit",
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Download failed (${res.status}) ${text}`.trim());
+    }
+    const blob = await res.blob();
+    const filename =
+      (res.headers.get("content-disposition")?.match(/filename="?([^"]+)"?/)?.[1]) ||
+      suggestedName;
+
+    const blobUrl = URL.createObjectURL(blob);
+    const newTab = window.open(blobUrl, "_blank", "noopener,noreferrer");
+    if (!newTab) {
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch (e) {
+    console.error("openProtectedFile error:", e);
+    alert("Couldn’t open the file. You may need to log in again, or the file path is invalid.");
+  }
+}
 
 const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
   const navigate = useNavigate();
@@ -11,9 +241,25 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
   const [attendance, setAttendance] = useState([]);
   const [qualifications, setQualifications] = useState([]);
   const [trainings, setTrainings] = useState([]);
+  const [submittedEOIs, setSubmittedEOIs] = useState([]);
+
+  // NEW: Training results list (from /volunteers/:id/training-results)
+  const [results, setResults] = useState([]);
+  const [resultsError, setResultsError] = useState("");
+
+  // Server notifications (expiry/expired)
+  const [notifications, setNotifications] = useState([]);
+  const [notifBusy, setNotifBusy] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [submittedEOIs, setSubmittedEOIs] = useState([]);
+  const [eoiBusyId, setEoiBusyId] = useState(null);
+  const [cancelBusyId, setCancelBusyId] = useState(null);
+  const [liveMsg, setLiveMsg] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [refreshBusy, setRefreshBusy] = useState(false);
+
+  useEffect(() => { injectStylesOnce(); }, []);
 
   useEffect(() => {
     const storedVolunteer =
@@ -23,196 +269,708 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
       navigate("/volunteer-login");
       return;
     }
-
     setVolunteer(storedVolunteer);
+    loadAll(storedVolunteer.volunteer_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialVolunteer]);
+
+  const loadAll = async (volunteerId) => {
     setLoading(true);
-
-    const fetchData = async () => {
-      try {
-        // Fetch updated volunteer info
-        const volunteerResponse = await api.getVolunteerById(
-          storedVolunteer.volunteer_id
-        );
-        setVolunteer(volunteerResponse.data);
-        localStorage.setItem("volunteer", JSON.stringify(volunteerResponse.data));
-
-        // Fetch attendance
-        const attendanceResponse = await api.getAttendanceByVolunteer(
-          storedVolunteer.volunteer_id
-        );
-        setAttendance(attendanceResponse.data);
-
-        // Fetch qualifications
-        const qualificationsResponse = await api.getQualificationsByVolunteer(
-          storedVolunteer.volunteer_id
-        );
-        setQualifications(qualificationsResponse.data);
-
-        // Fetch available trainings
-        const trainingsResponse = await api.getTrainings();
-        setTrainings(trainingsResponse.data);
-
-        // Fetch volunteer's submitted EOIs
-        const eoisResponse = await api.getVolunteerEOIs(
-          storedVolunteer.volunteer_id
-        );
-        setSubmittedEOIs(eoisResponse.data);
-      } catch (err) {
-        console.error(err);
-        setError("Unable to fetch volunteer data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [initialVolunteer, navigate]);
-
-  // Submit EOI handler
-  const handleSubmitEOI = async (trainingId, trainingTitle) => {
-    if (!volunteer || !volunteer.volunteer_id) return;
-
+    setError("");
     try {
-      const response = await api.submitEOI(volunteer.volunteer_id, trainingId);
+      const [
+        volunteerResponse,
+        attendanceResponse,
+        qualificationsResponse,
+        trainingsResponse,
+        eoisResponse,
+        notifResponse,
+      ] = await Promise.all([
+        api.getVolunteerById(volunteerId),
+        api.getAttendanceByVolunteer(volunteerId),
+        api.getQualificationsByVolunteer(volunteerId),
+        api.getTrainings(),
+        api.getVolunteerEOIs(volunteerId),
+        api.getVolunteerNotifications(volunteerId),
+      ]);
 
-      if (response.data?.error) {
-        alert(`Error: ${response.data.error}`);
-      } else {
-        alert(`EOI submitted successfully for "${trainingTitle}"!`);
-        // Refresh submitted EOIs list
-        const updatedEOIs = await api.getVolunteerEOIs(volunteer.volunteer_id);
-        setSubmittedEOIs(updatedEOIs.data);
+      setVolunteer(volunteerResponse.data);
+      localStorage.setItem("volunteer", JSON.stringify(volunteerResponse.data));
+      setAttendance(attendanceResponse.data || []);
+      setQualifications(qualificationsResponse.data || []);
+      setTrainings(trainingsResponse.data || []);
+      setSubmittedEOIs(eoisResponse.data || []);
+      setNotifications(notifResponse.data || []);
+
+      // Try to fetch training results (if backend endpoint exists)
+      try {
+        const res = await api.getVolunteerTrainingResults(volunteerId);
+        setResults(Array.isArray(res.data) ? res.data : []);
+        setResultsError("");
+      } catch (err) {
+        console.warn("Results endpoint not available or failed:", err?.response?.status || err);
+        setResults([]);
+        setResultsError("Results are not available yet.");
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to submit EOI. Check console for details.");
+      setError("Unable to fetch volunteer data.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  /* ---------- client-side fallback notices (if server hasn't created any yet) ---------- */
+  const trainingTitleById = useMemo(() => {
+    const map = new Map();
+    (trainings || []).forEach((t) => map.set(t.id, t.title));
+    return map;
+  }, [trainings]);
+
+  const localNotices = useMemo(() => {
+    const out = [];
+    (qualifications || []).forEach((q) => {
+      if (!q.expiry_date) return;
+      const d = daysUntil(q.expiry_date);
+      if (d === null) return;
+
+      const titleMap = {
+        90: "Qualification expiring in 90 days",
+        14: "Qualification expiring in 14 days",
+        0: "Qualification expired",
+      };
+      const trainingTitle = trainingTitleById.get(q.training_id) || `Training #${q.training_id}`;
+
+      if (d === 90 || d === 14 || d === 0) {
+        out.push({
+          id: `local-${q.id}-${d}`,
+          audience: "volunteer",
+          type: d === 0 ? "qualification_expired" : `qualification_expiry_t${d}`,
+          title: titleMap[d],
+          body:
+            d === 0
+              ? `Your "${trainingTitle}" qualification has expired today.`
+              : `Your "${trainingTitle}" qualification will expire in ${d} days.`,
+          meta: { qualification_id: q.id, training_id: q.training_id, expiry_date: q.expiry_date, local: true },
+          created_at: new Date().toISOString(),
+          read_at: null,
+        });
+      } else if (d < 0) {
+        out.push({
+          id: `local-${q.id}-expired`,
+          audience: "volunteer",
+          type: "qualification_expired",
+          title: "Qualification expired",
+          body: `Your "${trainingTitle}" qualification expired ${Math.abs(d)} day(s) ago.`,
+          meta: { qualification_id: q.id, training_id: q.training_id, expiry_date: q.expiry_date, local: true },
+          created_at: new Date().toISOString(),
+          read_at: null,
+        });
+      }
+    });
+    return out;
+  }, [qualifications, trainingTitleById]);
+
+  const mergedNotices = useMemo(() => {
+    const key = (n) => `${n.type}::${n?.meta?.qualification_id || "na"}`;
+    const map = new Map();
+    (notifications || []).forEach((n) => map.set(key(n), n));
+    (localNotices || []).forEach((n) => {
+      const k = key(n);
+      if (!map.has(k)) map.set(k, n);
+    });
+    return Array.from(map.values()).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  }, [notifications, localNotices]);
+
+  const anyLocal = useMemo(() => mergedNotices.some((n) => n?.meta?.local), [mergedNotices]);
+
+  const hasSubmitted = (trainingId) =>
+    submittedEOIs.some((e) => e.training_id === trainingId && e.status !== "cancelled");
+
+  const formatDate = (d) => (d ? new Date(d).toLocaleDateString() : "N/A");
+
+  const titleOf = (trainingId) => trainingTitleById.get(trainingId) || `Training #${trainingId}`;
+
+  const recentWins = useMemo(() => {
+    const wins = [];
+    (results || []).forEach((r) => {
+      const when = r.date_assessed ? new Date(r.date_assessed) : null;
+      const days = when ? Math.floor((Date.now() - when.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      if (days !== null && days <= 30) {
+        if (r.result === "competent") {
+          wins.push({ type: "competent", title: titleOf(r.training_id), date: r.date_assessed });
+        } else if (r.result === "participated") {
+          wins.push({ type: "participated", title: titleOf(r.training_id), date: r.date_assessed });
+        }
+      }
+    });
+    return wins.slice(0, 5);
+  }, [results]);
+
+  const handleSubmitEOI = async (trainingId, trainingTitle) => {
+    if (!volunteer || !volunteer.volunteer_id || hasSubmitted(trainingId)) return;
+    setEoiBusyId(trainingId);
+    try {
+      const response = await api.submitEOI(volunteer.volunteer_id, trainingId);
+      if (response.data?.error) {
+        setLiveMsg(`Error submitting EOI for ${trainingTitle}.`);
+        alert(`Error: ${response.data.error}`);
+      } else {
+        setLiveMsg(`EOI submitted for ${trainingTitle}.`);
+        const updatedEOIs = await api.getVolunteerEOIs(volunteer.volunteer_id);
+        setSubmittedEOIs(updatedEOIs.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+      setLiveMsg(`Failed to submit EOI for ${trainingTitle}.`);
+      alert("Failed to submit EOI. Check console for details.");
+    } finally {
+      setEoiBusyId(null);
+    }
+  };
+
+  const handleCancelEOI = async (eoiId, trainingTitle) => {
+    if (!window.confirm("Cancel this EOI?")) return;
+    setCancelBusyId(eoiId);
+    try {
+      await api.cancelEOI(eoiId);
+      const updatedEOIs = await api.getVolunteerEOIs(volunteer.volunteer_id);
+      setSubmittedEOIs(updatedEOIs.data || []);
+      setLiveMsg(`EOI cancelled for ${trainingTitle}.`);
+    } catch (err) {
+      console.error(err);
+      setLiveMsg(`Failed to cancel EOI for ${trainingTitle}.`);
+      alert("Failed to cancel EOI. See console for details.");
+    } finally {
+      setCancelBusyId(null);
+    }
+  };
+
+  const markNoticeRead = async (id) => {
+    setNotifBusy(true);
+    try {
+      await api.markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
+      );
+    } catch (e) {
+      console.error("Failed to mark notification read", e);
+    } finally {
+      setNotifBusy(false);
+    }
+  };
+
+  const triggerReminderRefresh = async () => {
+  setRefreshBusy(true);
+  try {
+    await api.runReminderCheck(); // now hits /qualifications/reminders/run
+    const res = await api.getVolunteerNotifications(volunteer.volunteer_id);
+    setNotifications(res.data || []);
+    setLiveMsg("Reminders refreshed.");
+  } catch (e) {
+    console.error(e);
+    const serverMsg = e?.response?.data?.error;
+    alert(serverMsg || "Couldn't refresh reminders. Check server logs.");
+    setLiveMsg("Could not refresh reminders.");
+  } finally {
+    setRefreshBusy(false);
+  }
+};
+
+
   if (!volunteer) return null;
-  if (loading) return <p>Loading dashboard...</p>;
+  if (loading) return <p className="dashboard-container">Loading dashboard…</p>;
 
   return (
     <div className="dashboard-container">
-      <VolunteerNavbar onLogout={onLogout} volunteerId={volunteer?.volunteer_id} />
+      <a href="#main-content" className="skip-link">Skip to main content</a>
 
-      <main className="dashboard-main">
-        <header className="dashboard-header">
-          <img
-            src={icon}
-            alt="Dashboard Logo"
-            style={{ height: "50px", marginBottom: "0.5rem" }}
-          />
-          <h1 tabIndex="0">Welcome, {volunteer?.name}</h1>
+      <div role="status" aria-live="polite" className="sr-live">{liveMsg}</div>
+
+      <VolunteerNavbar
+        onLogout={onLogout}
+        volunteerId={volunteer?.volunteer_id}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
+
+      <main className="dashboard-main" id="main-content" tabIndex={-1}>
+        {/* Hero */}
+        <header className="dashboard-hero" aria-label="Volunteer welcome">
+          <img src={icon} alt="" className="hero-icon" aria-hidden="true" />
+          <h1 className="hero-title">Welcome, {volunteer?.name}</h1>
+          <p className="hero-sub">Manage your courses, EOIs, attendance, and qualifications.</p>
         </header>
 
+        {error && <div className="alert alert-error" role="alert">❗ {error}</div>}
+
         <div className="dashboard-grid">
-          <Card title="Personal Info" icon={icon}>
-            <p><strong>Email:</strong> {volunteer?.email}</p>
-            <p><strong>Volunteer ID:</strong> {volunteer?.volunteer_id}</p>
-            <p><strong>Phone:</strong> {volunteer?.phone || "Not provided"}</p>
-          </Card>
+          {/* Row 1: Personal Info + Attendance */}
+          <section className="card col-6" tabIndex="0" aria-labelledby="personal-info-title">
+            <h2 id="personal-info-title">
+              <img src={icon} alt="" aria-hidden="true" /> 👤 Personal Info
+            </h2>
+            <div className="card-content">
+              <p><strong>Email:</strong> {volunteer?.email}</p>
+              <p><strong>Volunteer ID:</strong> {volunteer?.volunteer_id}</p>
+              <p><strong>Phone:</strong> {volunteer?.phone || "Not provided"} </p>
+              <div style={{marginTop:8}}>
+                <span className="status-badge">✅ Active Volunteer</span>
+              </div>
+              <Link to="/volunteer/profile" className="btn ghost" aria-label="Edit Profile">
+                ⚙️ Edit Profile
+              </Link>
+            </div>
+          </section>
 
-          <Card title="Attendance History" icon={icon}>
-            {error && <p className="error">{error}</p>}
-            {attendance.length === 0 ? (
-              <p>No attendance records found.</p>
-            ) : (
-              <ul>
-                {attendance.map(item => (
-                  <li key={item.id}>
-                    Clock-in: {item.clock_in || "N/A"}, Clock-out: {item.clock_out || "N/A"}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link to={`/volunteers/${volunteer?.volunteer_id}/attendance`} className="link-button">
-              View Full Attendance
-            </Link>
-          </Card>
+          <section className="card col-6" tabIndex="0" aria-labelledby="attendance-title">
+            <h2 id="attendance-title">
+              <img src={icon} alt="" aria-hidden="true" /> 🕒 Attendance History
+            </h2>
+            <div className="card-content">
+              {attendance.length === 0 ? (
+                <p>No attendance records found.</p>
+              ) : (
+                <ul>
+                  {attendance.map((item) => (
+                    <li key={item.id}>
+                      <strong>Clock-in:</strong>{" "}
+                      {item.clock_in ? (
+                        <time dateTime={item.clock_in}>{item.clock_in}</time>
+                      ) : "N/A"}
+                      {", "}
+                      <strong>Clock-out:</strong>{" "}
+                      {item.clock_out ? (
+                        <time dateTime={item.clock_out}>{item.clock_out}</time>
+                      ) : "N/A"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link
+                to={`/volunteers/${volunteer?.volunteer_id}/attendance`}
+                className="btn primary"
+              >
+                ↗️ View Full Attendance
+              </Link>
+            </div>
+          </section>
 
-          <Card title="Qualifications / Courses" icon={icon}>
-            {qualifications.length === 0 ? (
-              <p>No qualifications yet.</p>
-            ) : (
-              <ul>
-                {qualifications.map(q => (
-                  <li key={q.id}>
-                    Training ID: {q.training_id}, Issued: {q.issue_date || "N/A"}, Expiry: {q.expiry_date || "N/A"}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link to={`/volunteers/${volunteer?.volunteer_id}/qualifications`} className="link-button">
-              View All Qualifications
-            </Link>
-          </Card>
+          {/* Row 2: Qualifications + Alerts */}
+          <section className="card col-6" tabIndex="0" aria-labelledby="quals-title">
+            <h2 id="quals-title">
+              <img src={icon} alt="" aria-hidden="true" /> 🎖️ Qualifications / Courses
+            </h2>
+            <div className="card-content">
+              {qualifications.length === 0 ? (
+                <p>No qualifications yet.</p>
+              ) : (
+                <ul>
+                  {qualifications.map((q) => (
+                    <li key={q.id}>
+                      Training ID: {q.training_id}, Issued: {q.issue_date || "N/A"}, Expiry: {q.expiry_date || "N/A"}
+                      {q.document_path && (
+                        <span className="small-links">
+                          <button
+                            type="button"
+                            className="link-inline"
+                            onClick={() => openProtectedFile(q.document_path, `qualification-${q.id}.pdf`)}
+                          >
+                            View Certificate
+                          </button>
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-          <Card title="Available Trainings / Courses" icon={icon}>
-            {trainings.length === 0 ? (
-              <p>No trainings available.</p>
-            ) : (
-              <ul>
-                {trainings.map(t => (
-                  <li key={t.id}>
-                    {t.title} ({t.type}) - {t.start_date || "N/A"} to {t.end_date || "N/A"}
-                    <button
-                      style={{ marginLeft: "0.5rem", padding: "0.2rem 0.5rem", cursor: "pointer" }}
-                      onClick={() => handleSubmitEOI(t.id, t.title)}
-                      disabled={submittedEOIs.some(e => e.training_id === t.id)}
-                    >
-                      {submittedEOIs.some(e => e.training_id === t.id) ? "EOI Submitted" : "Submit EOI"}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+              <div className="row-actions" style={{marginTop:10}}>
+                <Link
+                  to={`/volunteers/${volunteer?.volunteer_id}/qualifications`}
+                  className="btn primary block"
+                  aria-label="View all qualifications"
+                  title="View all qualifications"
+                >
+                  ↗️ View All Qualifications
+                </Link>
+                <Link
+                  to="/volunteer/qualifications/add"
+                  state={{ volunteerId: volunteer?.volunteer_id }}
+                  className="btn success block"
+                  aria-label="Add or upload a qualification"
+                  title="Add or upload a qualification"
+                >
+                  ➕ Add / Upload Qualification
+                </Link>
+
+              </div>
+            </div>
+          </section>
+
+          <section className="card col-6" tabIndex="0" aria-labelledby="alerts-title">
+            <h2 id="alerts-title">
+              <img src={icon} alt="" aria-hidden="true" /> 🔔 Alerts & Reminders
+            </h2>
+            <div className="card-content">
+              <div className="refresh-row">
+                <button className="btn ghost" onClick={triggerReminderRefresh} disabled={refreshBusy} aria-busy={refreshBusy ? "true" : "false"}>
+                  {refreshBusy ? "Refreshing…" : "↻ Refresh reminders"}
+                </button>
+                {anyLocal && (
+                  <span className="badge-local" title="Client-side preview shown until the server issues official notices">
+                    showing local preview
+                  </span>
+                )}
+              </div>
+
+              {mergedNotices.length === 0 ? (
+                <p className="muted">No reminders right now. We'll let you know when something needs attention.</p>
+              ) : (
+                <>
+                  <ul className="notice-list">
+                    {mergedNotices.map((n) => (
+                      <li key={n.id}>
+                        {n.read_at ? "✓ " : "⏰ "}
+                        <strong>{n.title}</strong>
+                        {n.body ? ` — ${n.body}` : ""}
+                        {n.meta?.expiry_date && (
+                          <>
+                            {" "}
+                            <em className="muted">(Expiry: {formatDate(n.meta.expiry_date)})</em>
+                          </>
+                        )}
+                        {!n.read_at && !n?.meta?.local && (
+                          <button
+                            className="btn ghost"
+                            style={{marginLeft:8, padding: "6px 10px"}}
+                            onClick={() => markNoticeRead(n.id)}
+                            disabled={notifBusy}
+                          >
+                            Mark read
+                          </button>
+                        )}
+                        {n?.meta?.local && <span className="badge-local">preview</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="table-hint">
+                    Reminders appear ~90 days and 14 days before expiry, and on the day a qualification expires.
+                  </p>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Row 3: Trainings + My EOIs */}
+          <section className="card col-6" tabIndex="0" aria-labelledby="trainings-title">
+            <h2 id="trainings-title">
+              <img src={icon} alt="" aria-hidden="true" /> 🎯 Available Trainings / Courses
+            </h2>
+            <div className="card-content">
+              {trainings.length === 0 ? (
+                <p>No trainings available.</p>
+              ) : (
+                <div className="trainings-grid" role="list" aria-labelledby="trainings-heading">
+                  <h3 id="trainings-heading" className="sr-only">Available Trainings list</h3>
+                  {trainings.map((t) => {
+                    const disabled = hasSubmitted(t.id) || eoiBusyId === t.id;
+                    const label = hasSubmitted(t.id)
+                      ? "EOI Submitted"
+                      : eoiBusyId === t.id
+                      ? "Submitting…"
+                      : "Submit EOI";
+                    const startISO = t.start_date || "";
+                    const endISO = t.end_date || "";
+                    return (
+                      <article key={t.id} role="listitem" className="training-card" aria-labelledby={`training-${t.id}-title`}>
+                        <div className="training-title" id={`training-${t.id}-title`}>{t.title}</div>
+                        <div className="training-meta">
+                          <span className="status-badge">📚 {t.type}</span>
+                          {t.capacity != null && <span className="status-badge">🪑 Capacity: {t.capacity}</span>}
+                        </div>
+                        <div className="training-meta" style={{marginTop:6}}>
+                          <strong>Dates:</strong>{" "}
+                          <time dateTime={startISO}>{formatDate(startISO)}</time>
+                          {" "}–{" "}
+                          <time dateTime={endISO}>{formatDate(endISO)}</time>
+                        </div>
+                        <div className="training-actions">
+                          <button
+                            className="btn primary"
+                            onClick={() => handleSubmitEOI(t.id, t.title)}
+                            disabled={disabled}
+                            aria-disabled={disabled ? "true" : "false"}
+                            aria-busy={eoiBusyId === t.id ? "true" : "false"}
+                            aria-label={`${label} for ${t.title}`}
+                            title={label}
+                          >
+                            {hasSubmitted(t.id) ? "✅ EOI Submitted" : "✉️ Submit EOI"}
+                          </button>
+                          <Link to="/volunteer/my-eois" className="btn ghost" aria-label="Open My EOIs">
+                            📬 My EOIs
+                          </Link>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="card col-6" tabIndex="0" aria-labelledby="myeois-title">
+            <h2 id="myeois-title">
+              <img src={icon} alt="" aria-hidden="true" /> 📨 My EOIs
+            </h2>
+            <div className="card-content">
+              {submittedEOIs.length === 0 ? (
+                <p>You haven't submitted any EOIs yet.</p>
+              ) : (
+                <div className="table-wrap" role="region" aria-label="My EOIs table">
+                  <table className="eoi-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Training</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {submittedEOIs.map((e) => (
+                        <tr key={e.id}>
+                          <td>{e.training_title}</td>
+                          <td className={`td-status ${e.status}`}>
+                            <span className="status-badge">
+                              <span className="sr-only">Status: </span>
+                              {e.status === "pending" && "⏳ "}
+                              {e.status === "approved" && "✅ "}
+                              {e.status === "rejected" && "❌ "}
+                              {e.status === "cancelled" && "🚫 "}
+                              {e.status}
+                            </span>
+                          </td>
+                          <td className="td-actions">
+                            {e.status === "pending" ? (
+                              <button
+                                className="btn danger"
+                                onClick={() => handleCancelEOI(e.id, e.training_title)}
+                                disabled={cancelBusyId === e.id}
+                                aria-busy={cancelBusyId === e.id ? "true" : "false"}
+                                aria-label={`Cancel EOI for ${e.training_title}`}
+                                title="Cancel EOI"
+                              >
+                                {cancelBusyId === e.id ? "… Cancelling" : "🗑️ Cancel"}
+                              </button>
+                            ) : (
+                              <button className="btn ghost" disabled aria-disabled="true" title="No actions available">
+                                No action
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="table-hint">Tip: On small screens, scroll horizontally to see all columns.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Row 4: My Training Results + Achievements */}
+          <section className="card col-6" tabIndex="0" aria-labelledby="results-title">
+            <h2 id="results-title">
+              <img src={icon} alt="" aria-hidden="true" /> 🧪 My Training Results
+            </h2>
+            <div className="card-content">
+              {resultsError && <p className="muted">({resultsError})</p>}
+
+              {(!results || results.length === 0) ? (
+                <p>No results recorded yet.</p>
+              ) : (
+                <ul className="results-list">
+                  {results.map((r) => (
+                    <li key={r.id}>
+                      <strong>{titleOf(r.training_id)}</strong>
+                      <span className={`result-badge ${r.result || "not_assessed"}`}>
+                        {pretty(r.result)}
+                      </span>
+                      {r.date_assessed && (
+                        <> — <em className="muted">Assessed: {formatDate(r.date_assessed)}</em></>
+                      )}
+                      {r.assessor_name && <> — <span className="muted">Assessor: {r.assessor_name}</span></>}
+                      <span className="small-links">
+                        {r.certificate_path && (
+                          <button
+                            type="button"
+                            className="link-inline"
+                            onClick={() => openProtectedFile(r.certificate_path, `certificate-${r.id}.pdf`)}
+                          >
+                            Certificate
+                          </button>
+                        )}
+                        {r.evidence_path && (
+                          <button
+                            type="button"
+                            className="link-inline"
+                            onClick={() => openProtectedFile(r.evidence_path, `evidence-${r.id}`)}
+                          >
+                            Evidence
+                          </button>
+                        )}
+                      </span>
+                      {r.notes && <div className="muted" style={{marginTop:4}}>Notes: {r.notes}</div>}
+                      {r.result === "not_yet_competent" && r.next_opportunity && (
+                        <div className="muted" style={{marginTop:4}}>
+                          Next opportunity expected: {formatDate(r.next_opportunity)}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+
+          <section className="card col-6" tabIndex="0" aria-labelledby="achievements-title">
+            <h2 id="achievements-title">
+              <img src={icon} alt="" aria-hidden="true" /> 🏅 Recent Achievements
+            </h2>
+            <div className="card-content">
+              {recentWins.length === 0 ? (
+                <p className="muted">No new achievements in the last 30 days.</p>
+              ) : (
+                <ul>
+                  {recentWins.map((a, idx) => (
+                    <li key={idx}>
+                      {a.type === "competent" ? "🎉 " : "👏 "}
+                      {a.type === "competent" ? (
+                        <>Congratulations on achieving <strong>Competent</strong> in <em>{a.title}</em>!</>
+                      ) : (
+                        <>Thanks for participating in <em>{a.title}</em> — great effort toward developing your skills.</>
+                      )}
+                      {a.date && <> <em className="muted">({formatDate(a.date)})</em></>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="table-hint">This mirrors the acknowledgement in notifications (Section 9.2).</p>
+            </div>
+          </section>
         </div>
       </main>
     </div>
   );
 };
 
-const Card = ({ title, children, icon }) => (
-  <section className="card" tabIndex="0">
-    <h2>
-      {icon && <img src={icon} alt="Card Icon" style={{ height: "24px", marginRight: "0.5rem" }} />}
-      {title}
-    </h2>
-    <div className="card-content">{children}</div>
-  </section>
-);
-
-const VolunteerNavbar = ({ onLogout, volunteerId }) => {
-  const [menuOpen, setMenuOpen] = useState(false);
+/* Navbar */
+const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
+  const toggleLabel = menuOpen ? "Close menu" : "Open menu";
+  const linkClass = ({ isActive }) => `navlink ${isActive ? "active" : ""}`;
+  const closeMenu = () => setMenuOpen(false);
 
   return (
-    <nav className="navbar" aria-label="Volunteer Navigation">
+    <nav className="navbar" aria-label="Main">
       <div className="navbar-inner">
-        <div className="navbar-brand">
-          <img src={icon} alt="Logo" style={{ height: "40px" }} />
-          Volunteer Dashboard
+        <div className="navbar-top">
+          <button
+            className="navbar-toggle"
+            aria-label={toggleLabel}
+            aria-expanded={menuOpen}
+            aria-controls="navbar-links"
+            onClick={() => setMenuOpen(!menuOpen)}
+            title={toggleLabel}
+          >
+            {menuOpen ? (
+              <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            )}
+          </button>
+
+          <div className="navbar-brand-center" aria-label="Volunteer Dashboard">
+            <img src={icon} alt="" aria-hidden="true" />
+            <div className="navbar-title">Volunteer Dashboard</div>
+          </div>
+
+          <div className="navbar-spacer" aria-hidden="true"></div>
         </div>
-        <button
-          className="navbar-toggle"
-          aria-label="Toggle menu"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen(!menuOpen)}
+
+        <ul
+          id="navbar-links"
+          className={`navbar-links ${menuOpen ? "open" : ""}`}
+          role="menubar"
         >
-          ☰
-        </button>
-        <ul className={`navbar-links ${menuOpen ? "open" : ""}`}>
-          <li><NavLink to="/volunteer/dashboard" className="navlink">Dashboard</NavLink></li>
-          <li><NavLink to={volunteerId ? `/volunteers/${volunteerId}/attendance` : "#"} className="navlink">Attendance</NavLink></li>
-          <li><NavLink to={volunteerId ? `/volunteers/${volunteerId}/qualifications` : "#"} className="navlink">Qualifications</NavLink></li>
-          <li><NavLink to="/trainings" className="navlink">Trainings / Submit EOI</NavLink></li>
-          <li><NavLink to="/volunteer/profile" className="navlink">My Profile</NavLink></li>
-          <li><button onClick={onLogout} className="logout-button">Logout</button></li>
+          <li role="none">
+            <NavLink to="/volunteer/dashboard" className={linkClass} role="menuitem" onClick={closeMenu}>
+              🏠 Dashboard
+            </NavLink>
+          </li>
+          <li role="none">
+            <NavLink
+              to={volunteerId ? `/volunteers/${volunteerId}/attendance` : "#"}
+              className={linkClass}
+              role="menuitem"
+              onClick={closeMenu}
+            >
+              🕒 Attendance
+            </NavLink>
+          </li>
+          <li role="none">
+            <NavLink
+              to={volunteerId ? `/volunteers/${volunteerId}/qualifications` : "#"}
+              className={linkClass}
+              role="menuitem"
+              onClick={closeMenu}
+            >
+              🎖️ Qualifications
+            </NavLink>
+          </li>
+          {/* keep volunteers on the volunteer dashboard for trainings */}
+          <li role="none">
+            <a
+              href="/volunteer/dashboard#trainings-title"
+              className="navlink"
+              role="menuitem"
+              onClick={closeMenu}
+            >
+              🎯 Trainings / Submit EOI
+            </a>
+          </li>
+          <li role="none">
+            <NavLink to="/volunteer/my-eois" className={linkClass} role="menuitem" onClick={closeMenu}>
+              📨 My EOIs
+            </NavLink>
+          </li>
+          <li role="none">
+            <NavLink to="/volunteer/profile" className={linkClass} role="menuitem" onClick={closeMenu}>
+              👤 My Profile
+            </NavLink>
+          </li>
+          <li role="none">
+            <button onClick={onLogout} className="logout-button" role="menuitem" title="Logout">
+              🚪 Logout
+            </button>
+          </li>
         </ul>
       </div>
     </nav>
   );
 };
+
+function pretty(v) {
+  switch (v) {
+    case "competent": return "Competent";
+    case "not_yet_competent": return "Not Yet Competent";
+    case "not_assessed": return "Not Assessed";
+    case "participated": return "Participated";
+    default: return v || "Not Assessed";
+  }
+}
 
 export default VolunteerDashboard;

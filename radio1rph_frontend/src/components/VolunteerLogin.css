@@ -1,68 +1,177 @@
-.login-container {
-  max-width: 400px;
-  margin: 3rem auto;
-  padding: 2rem;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+/* src/components/VolunteerLogin.css */
+:root{
+  --bg:#f6f7fb;
+  --surface:#ffffff;
+  --text:#111827;
+  --muted:#4b5563;
+  --border:#e5e7eb;
+  --primary:#2563eb;
+  --primary-700:#1d4ed8;
+  --focus:#111827;
+  --shadow:0 10px 24px rgba(0,0,0,.08);
 }
 
-h1 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  font-size: 1.8rem;
+*{box-sizing:border-box}
+
+.login-container{
+  max-width: 560px;
+  margin: 40px auto;
+  padding: 16px;
+  color: var(--text);
 }
 
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+h1{margin:0 0 14px 0;font-size:1.8rem}
+
+.login-form{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: var(--shadow);
 }
 
-.login-form input {
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  font-size: 1rem;
+label{
+  display:block;
+  margin-top:10px;
+  margin-bottom:6px;
+  font-weight:700;
 }
 
-.login-btn {
-  padding: 0.75rem 1rem;
-  background-color: #28a745;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
+input[type="email"],input[type="password"],input[type="text"]{
+  width:100%;
+  padding:12px 12px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  font-size:1rem;
 }
 
-.login-btn:disabled {
-  background-color: #6c757d;
-  cursor: not-allowed;
+input:focus{
+  outline:3px solid var(--focus);
+  outline-offset:2px;
 }
 
-.login-btn:hover:not(:disabled),
-.login-btn:focus:not(:disabled) {
-  background-color: #218838;
-  outline: 2px solid #218838;
-  outline-offset: 2px;
+/* Password show/hide alignment (same as AdminLogin) */
+.pw-wrap{ position:relative; }
+.pw-wrap input{ padding-right:90px; }
+.pw-toggle{
+  position:absolute !important;
+  right:8px;
+  top:50%;
+  transform: translateY(-50%);
+  min-height:0 !important;
+  height:36px;
+  padding:0 12px !important;
+  display:inline-flex;
+  align-items:center;
+  border-radius:8px;
 }
 
-.error {
-  color: #dc3545;
+/* Buttons */
+.login-btn{
+  min-height:44px;
+  min-width:44px;
+  border:none;
+  border-radius:10px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:800;
+  transition:transform .05s ease, background .15s ease;
+  margin-top:14px;
+}
+.login-btn:active{transform:scale(.98)}
+.login-btn:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+
+.login-btn.primary{
+  background: var(--primary);
+  color:#fff;
+}
+.login-btn.primary:hover{ background: var(--primary-700) }
+
+.login-btn.ghost{
+  background:#f3f4f6;
+  color: var(--text);
+  border:1px solid var(--border);
 }
 
-.success {
-  color: #28a745;
+/* Messages */
+.error{
+  background:#fef2f2;
+  color:#7f1d1d;
+  border:1px solid #fecaca;
+  padding:10px;
+  border-radius:10px;
+  margin:6px 0 10px;
 }
 
-.auth-links {
-  margin-top: 1rem;
-  font-size: 0.9rem;
-  text-align: center;
+.muted{ color: var(--muted) }
+
+/* CTA cards (same visual language as AdminLogin) */
+.auth-cta{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:14px;
+  margin-top:16px;
+}
+@media (max-width:720px){
+  .auth-cta{ grid-template-columns: 1fr; }
 }
 
-.auth-links span {
-  cursor: pointer;
-  text-decoration: underline;
+.auth-card{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
 }
+.auth-card:hover,
+.auth-card:focus-within{
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(0,0,0,.10);
+  border-color:#dbe2ea;
+}
+
+.auth-card-header{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:6px;
+}
+.auth-card-header h2{
+  font-size:1.1rem;
+  margin:0;
+}
+.auth-icon{
+  width:26px;
+  height:26px;
+  fill: var(--primary);
+}
+
+.cta-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+.cta-btn{
+  min-height:44px;
+  min-width:44px;
+  border-radius:10px;
+  padding:10px 14px;
+  font-weight:800;
+  cursor:pointer;
+  background:#ffffff;
+  border:1px solid var(--border);
+  color: var(--text);
+  transition:transform .05s ease, background .15s ease, border-color .15s ease;
+}
+.cta-btn:hover{ background:#f3f4f6 }
+.cta-btn:active{ transform:scale(.98) }
+.cta-btn:focus-visible{ outline:3px solid var(--focus);outline-offset:2px }
+
+.cta-btn.primary{
+  background: var(--primary);
+  color:#fff;
+  border-color: transparent;
+}
+.cta-btn.primary:hover{ background: var(--primary-700) }

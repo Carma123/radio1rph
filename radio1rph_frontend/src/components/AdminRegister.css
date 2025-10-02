@@ -1,0 +1,210 @@
+/* ------------------------------------------
+   AdminRegister.css — light + compact (matches AdminLogin)
+   WCAG AA, same tokens, same spacing, same buttons
+-------------------------------------------*/
+
+:root{
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --text: #0b1220;
+  --muted: #4b5563;
+  --border: #e5e7eb;
+
+  --primary: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-50: #eaf2ff;
+
+  --ring: #111827;
+  --success-bg: #ecfdf5;
+  --success-border: #a7f3d0;
+  --success-text: #065f46;
+  --error-bg: #fef2f2;
+  --error-border: #fecaca;
+  --error-text: #7f1d1d;
+
+  --shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.10);
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 10px;
+  --focus-outline: 3px solid var(--ring);
+  --space: clamp(14px, 2vw, 18px);
+}
+
+@media (prefers-reduced-motion: reduce){
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+*{ box-sizing: border-box; }
+html, body { height: 100%; }
+body{
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Layout */
+.page{
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 4vw, 32px);
+}
+
+/* Card (same compact width as Login) */
+.card{
+  width: min(500px, 92%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: clamp(18px, 4vw, 28px);
+}
+
+/* Title */
+.title{
+  font-size: clamp(1.6rem, 2.6vw, 1.9rem);
+  margin: 0 0 6px 0;
+  text-align: center;
+}
+
+/* Alerts */
+.alert{
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin: 10px 0 12px;
+  border: 1px solid;
+}
+.alert-error{
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+.alert-success{
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+/* Form (same max width as Login) */
+.form{
+  display: grid;
+  gap: var(--space);
+  margin-top: 8px;
+  max-width: 380px;
+  margin-left: auto;
+  margin-right: auto;
+}
+label{
+  display: inline-block;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+/* Inputs */
+.input-wrap{ position: relative; }
+input[type="text"],
+input[type="email"],
+input[type="password"]{
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--text);
+  font-size: 1rem;
+  min-height: 44px;
+}
+input::placeholder{ color: #9aa3af; }
+
+input:focus-visible,
+button:focus-visible{
+  outline: var(--focus-outline);
+  outline-offset: 2px;
+}
+
+/* Show/Hide buttons in password fields */
+.show-btn{
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  padding: 6px 10px !important;
+  min-height: 0 !important;
+  line-height: 1;
+}
+
+/* Buttons (identical to Login) */
+.btn{
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-weight: 800;
+  border-radius: var(--radius-sm);
+  min-height: 48px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform .06s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease;
+  width: 100%;
+}
+.btn:hover{ background: #f3f4f6; }
+.btn:active{ transform: scale(.98); }
+.btn:disabled{ opacity: .6; cursor: not-allowed; }
+
+.btn-primary{
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, .28);
+}
+.btn-primary:hover{ background: var(--primary-600); box-shadow: 0 8px 20px rgba(37, 99, 235, .32); }
+
+.btn-outline{
+  background: #fff;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.btn-ghost{
+  background: #f9fafb;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* Divider + Quick Links (styled like compact CTA area) */
+.seg{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px auto 10px;
+  max-width: 420px;
+}
+.seg .line{
+  height: 1px; flex: 1;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,.18), transparent);
+}
+.seg .seg-text{
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+.quick-links{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* High-contrast mode */
+@media (forced-colors: active){
+  .card, .btn, input { border: 1px solid ButtonText; }
+  .btn-primary { background: Highlight; color: HighlightText; }
+  .btn-outline { border-color: ButtonText; color: ButtonText; }
+}
