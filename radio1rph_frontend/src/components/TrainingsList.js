@@ -56,7 +56,7 @@ const TrainingsList = () => {
         }
       } catch (err) {
         console.error("Error fetching trainings:", err);
-        setError("Failed to load trainings. Please try again.");
+        setError("Failed to load training list. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -147,19 +147,19 @@ const TrainingsList = () => {
     );
   };
 
-  if (loading) return <p style={{ padding: "1rem" }}>Loading trainings…</p>;
+  if (loading) return <p style={{ padding: "1rem" }}>Loading training…</p>;
 
   return (
     <div style={{ padding: "1rem", maxWidth: "1100px", margin: "0 auto" }}>
       <header className="tl-header">
-        <h1 tabIndex="0" className="tl-title">Trainings</h1>
+        <h1 tabIndex="0" className="tl-title">Training</h1>
         <div className="tl-tools">
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search title, type, provider, trainer, venue"
-            aria-label="Search trainings"
+            aria-label="Search training"
             className="tl-search"
           />
           <button
@@ -175,7 +175,7 @@ const TrainingsList = () => {
       {error && <div role="alert" className="alert alert-error">{error}</div>}
 
       <div className="table-wrap">
-        <table className="tl-table" aria-label="Trainings List">
+        <table className="tl-table" aria-label="Training List">
           <thead>
             <tr>
               <th style={thStyle}>Title</th>
@@ -280,7 +280,7 @@ const TrainingsList = () => {
             ) : (
               <tr>
                 <td colSpan="9" style={{ padding: "1rem", textAlign: "center", color: "#555" }}>
-                  No trainings found.
+                  No training found.
                 </td>
               </tr>
             )}

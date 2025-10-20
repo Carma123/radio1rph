@@ -9,6 +9,7 @@ const RESULT_OPTIONS = [
   { value: "not_yet_competent", label: "Not Yet Competent" },
   { value: "not_assessed", label: "Not Assessed" },
   { value: "participated", label: "Participated" },
+  { value: "did_not_attend", label: "Did Not Attend" }, // ⬅️ added
 ];
 
 const ISSUED_BY = [
@@ -432,7 +433,7 @@ const AdminCoursePanel = () => {
             aria-label="Export approved roster as CSV"
             title="Export approved roster as CSV"
           >
-            📥 Export Approved CSV
+            📥 Download Report
           </button>
         </div>
       </header>
@@ -785,6 +786,7 @@ function pretty(v) {
     case "not_yet_competent": return "Not Yet Competent";
     case "not_assessed": return "Not Assessed";
     case "participated": return "Participated";
+    case "did_not_attend": return "Did Not Attend"; // ⬅️ added
     default: return v;
   }
 }

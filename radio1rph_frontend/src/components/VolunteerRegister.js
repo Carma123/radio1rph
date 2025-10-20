@@ -1,25 +1,16 @@
 // src/components/VolunteerRegister.js
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import "./VolunteerRegister.css"; // can reuse styles from AdminLogin.css/VolunteerLogin.css as well
+import "./VolunteerLogin.css"; // Reuse the same styles as login
 
-/* Inline icons (matching Admin/Volunteer login look) */
-const IconUser = (props) => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" className="auth-icon" {...props}>
-    <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1c0-2.83-3.67-5-8-5Z" />
-  </svg>
-);
+/* Inline icons (same vibe as VolunteerLogin) */
 const IconMail = (props) => (
   <svg aria-hidden="true" viewBox="0 0 24 24" className="auth-icon" {...props}>
     <path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h15A2.5 2.5 0 0 1 22 6.5v11A2.5 2.5 0 0 1 19.5 20h-15A2.5 2.5 0 0 1 2 17.5v-11Zm2.3-.4 7.08 5.16a1 1 0 0 0 1.24 0L19.7 6.1M20 8.2l-6.54 4.76a3 3 0 0 1-3.64 0L3.3 8.2" />
   </svg>
 );
-const IconPhone = (props) => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" className="auth-icon" {...props}>
-    <path d="M17 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Zm-5 18a1.25 1.25 0 1 1 1.25-1.25A1.25 1.25 0 0 1 12 20Zm4-4H8V6h8Z" />
-  </svg>
-);
+
 const IconLock = (props) => (
   <svg aria-hidden="true" viewBox="0 0 24 24" className="auth-icon" {...props}>
     <path d="M7 10V8a5 5 0 1 1 10 0v2h1.5A2.5 2.5 0 0 1 21 12.5v7A2.5 2.5 0 0 1 18.5 22h-13A2.5 2.5 0 0 1 3 19.5v-7A2.5 2.5 0 0 1 5.5 10H7Zm2-2a3 3 0 0 1 6 0v2H9V8Zm5.5 7a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z" />
@@ -28,229 +19,124 @@ const IconLock = (props) => (
 
 const VolunteerRegister = () => {
   const navigate = useNavigate();
-  const nameRef = useRef(null);
-  const liveRef = useRef(null);
-
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     name: "",
     email: "",
     phone: "",
     password: "",
   });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
 
-  const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const speak = (msg) => {
-    if (!liveRef.current) return;
-    liveRef.current.textContent = "";
-    setTimeout(() => (liveRef.current.textContent = msg), 10);
-  };
-
-  useEffect(() => {
-    nameRef.current?.focus(); // autofocus for accessibility
-  }, []);
-
-  const handleChange = (e) => {
-    setFormData((s) => ({ ...s, [e.target.name]: e.target.value }));
-  };
+  const setField = (k, v) => setForm((s) => ({ ...s, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
+    setErr("");
+    setMsg("");
 
-    const { name, email, password } = formData;
-    if (!name || !email || !password) {
-      setError("Please fill in all required fields.");
-      speak("Please fill in all required fields");
+    const payload = {
+      name: (form.name || "").trim(),
+      email: (form.email || "").trim().toLowerCase(),
+      phone: (form.phone || "").trim(),
+      password: form.password || "",
+    };
+
+    if (!payload.name || !payload.email || !payload.password) {
+      setErr("Name, email and password are required.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      speak("Password must be at least 6 characters");
-      return;
-    }
 
-    setLoading(true);
+    setBusy(true);
     try {
-      await api.registerVolunteer(formData);
-      setSuccess("Registration successful! Redirecting to login…");
-      speak("Registration successful");
-      setTimeout(() => navigate("/volunteer-login"), 1200);
-    } catch (err) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        "Registration failed. Please try again.";
-      setError(msg);
-      speak("Registration failed");
+      await api.registerVolunteer(payload);
+      setMsg("Registered! You can now log in.");
+      // Optional: auto-login then redirect
+      // await api.loginVolunteer({ email: payload.email, password: payload.password });
+      // navigate("/volunteer/dashboard", { replace: true });
+    } catch (ex) {
+      const serverMsg =
+        ex?.response?.data?.error ||
+        ex?.response?.data?.message ||
+        ex?.message ||
+        "Could not register right now.";
+      setErr(serverMsg);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
-  const errorId = error ? "vol-reg-error" : undefined;
-  const successId = success ? "vol-reg-success" : undefined;
-
   return (
-    <div className="login-container">
-      {/* Screen-reader live region */}
-      <span
-        ref={liveRef}
-        className="sr-only"
-        aria-live="polite"
-        aria-atomic="true"
-        style={{
-          position: "absolute",
-          width: 1,
-          height: 1,
-          padding: 0,
-          margin: -1,
-          overflow: "hidden",
-          clip: "rect(0,0,0,0)",
-          whiteSpace: "nowrap",
-          border: 0,
-        }}
-      />
+    <div className="login-container">{/* same wrapper style as login */}
+      <h1>Volunteer Registration</h1>
 
-      <h1 tabIndex={-1}>Volunteer Register</h1>
-      <p className="muted" style={{ margin: "0 0 12px 0" }}>
-        Create your account to access the volunteer dashboard, EOIs, and more.
-      </p>
+      {err && <p className="error" role="alert">{err}</p>}
+      {msg && <p className="success" role="status">{msg}</p>}
 
-      {error && (
-        <p id={errorId} className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {success && (
-        <p id={successId} className="success" role="status">
-          {success}
-        </p>
-      )}
+      <form className="login-form" onSubmit={handleSubmit} noValidate>
+        <label htmlFor="name">Name</label>
+        <input
+          id="name"
+          value={form.name}
+          onChange={(e) => setField("name", e.target.value)}
+          required
+          disabled={busy}
+          placeholder="Your full name"
+        />
 
-      <form
-        onSubmit={handleSubmit}
-        className="login-form"
-        aria-describedby={[errorId, successId].filter(Boolean).join(" ") || undefined}
-        noValidate
-      >
-        {/* Name */}
-        <label htmlFor="name">Full Name</label>
-        <div className="pw-wrap" style={{ paddingRight: 0 }}>
-          <div style={{ position: "relative" }}>
-            <IconUser style={{ position: "absolute", left: 10, top: 10 }} />
-            <input
-              ref={nameRef}
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              aria-required="true"
-              aria-invalid={!!error}
-              placeholder="Your full name"
-              style={{ paddingLeft: 44 }}
-              disabled={loading}
-            />
-          </div>
-        </div>
-
-        {/* Email */}
         <label htmlFor="email">Email</label>
-        <div className="pw-wrap" style={{ paddingRight: 0 }}>
-          <div style={{ position: "relative" }}>
-            <IconMail style={{ position: "absolute", left: 10, top: 10 }} />
-            <input
-              type="email"
-              id="email"
-              name="email"
-              inputMode="email"
-              autoComplete="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              aria-required="true"
-              aria-invalid={!!error}
-              placeholder="you@example.org"
-              style={{ paddingLeft: 44 }}
-              disabled={loading}
-            />
-          </div>
-        </div>
+        <input
+          id="email"
+          type="email"
+          autoComplete="email"
+          value={form.email}
+          onChange={(e) => setField("email", e.target.value)}
+          required
+          disabled={busy}
+          placeholder="you@example.org"
+        />
 
-        {/* Phone (optional) */}
-        <label htmlFor="phone">Phone Number (optional)</label>
-        <div className="pw-wrap" style={{ paddingRight: 0 }}>
-          <div style={{ position: "relative" }}>
-            <IconPhone style={{ position: "absolute", left: 10, top: 10 }} />
-            <input
-              type="text"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="e.g. 0400 000 000"
-              style={{ paddingLeft: 44 }}
-              disabled={loading}
-            />
-          </div>
-        </div>
+        <label htmlFor="phone">Phone (optional)</label>
+        <input
+          id="phone"
+          value={form.phone}
+          onChange={(e) => setField("phone", e.target.value)}
+          disabled={busy}
+          placeholder="04xx xxx xxx"
+        />
 
-        {/* Password */}
         <label htmlFor="password">Password</label>
-        <div className="pw-wrap">
-          <div style={{ position: "relative" }}>
-            <IconLock style={{ position: "absolute", left: 10, top: 10 }} />
-            <input
-              type={showPw ? "text" : "password"}
-              id="password"
-              name="password"
-              autoComplete="new-password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              aria-required="true"
-              aria-invalid={!!error}
-              placeholder="Choose a strong password (min 6 chars)"
-              style={{ paddingLeft: 44 }}
-              disabled={loading}
-            />
-            <button
-              type="button"
-              className="pw-toggle"
-              onClick={() => setShowPw((s) => !s)}
-              aria-pressed={showPw ? "true" : "false"}
-              aria-label={showPw ? "Hide password" : "Show password"}
-              disabled={loading}
-            >
-              {showPw ? "Hide" : "Show"}
-            </button>
-          </div>
+        <div className="pw-wrap">{/* matches login password styling */}
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={(e) => setField("password", e.target.value)}
+            required
+            disabled={busy}
+            placeholder="Create a password"
+          />
         </div>
 
-        <button type="submit" className="login-btn primary" disabled={loading} aria-busy={loading ? "true" : "false"}>
-          {loading ? "Registering…" : "Register"}
+        <button type="submit" className="login-btn primary" disabled={busy}>
+          {busy ? "Working…" : "Create account"}
         </button>
       </form>
 
-      {/* Auth navigation + CTAs to keep parity with other screens */}
+      {/* CTA cards — identical layout/classes to VolunteerLogin */}
       <section className="auth-cta" role="navigation" aria-label="Other options">
-        <div className="auth-card" aria-labelledby="have-account-title">
+        <div className="auth-card" aria-labelledby="already-vol-title">
           <div className="auth-card-header">
-            <IconUser />
-            <h2 id="have-account-title">Already have an account?</h2>
+            <IconMail />
+            <h2 id="already-vol-title">Already registered?</h2>
           </div>
-        <p className="muted">Sign in to your volunteer dashboard.</p>
+          <p className="muted">Head to the sign-in page to access your dashboard.</p>
           <div className="cta-actions">
             <button
               type="button"
-              className="cta-btn"
+              className="cta-btn primary"
               onClick={() => navigate("/volunteer-login")}
             >
               Volunteer Login
@@ -276,14 +162,10 @@ const VolunteerRegister = () => {
         </div>
       </section>
 
-      {/* Small focus/spacing tweaks for mobile */}
       <style>{`
         input:focus-visible, button:focus-visible {
           outline: 3px solid #93c5fd80;
           outline-offset: 2px;
-        }
-        @media (max-width: 480px) {
-          form { gap: 0.75rem; }
         }
       `}</style>
     </div>

@@ -239,30 +239,73 @@ const EOIList = () => {
   };
 
   // ---------- CSV Export (current filtered rows) ----------
-  const exportCSV = () => {
-    const rows = [
-      ["Volunteer Name", "Training", "Status", "Submitted At", "Volunteer Email", "Volunteer Phone"],
-      ...filteredEOIs.map((e) => [
-        e.volunteer_name || "",
-        e.training_title || "",
-        e.status || "",
-        e.submitted_at || "",
-        e.volunteer_email || "",
-        e.volunteer_phone || "",
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const namePart = selectedTraining?.title ? selectedTraining.title.replace(/[^\w\-]+/g, "_") : "eoi";
-    a.href = url;
-    a.download = `EOIs_${namePart}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    speak("CSV downloaded.");
+  const exportCSV = async () => {
+    try {
+      speak("Collecting contact details…");
+
+      // Build a unique set of volunteer IDs from the currently filtered rows
+      const ids = Array.from(
+        new Set((filteredEOIs || [])
+          .map((e) => e.volunteer_id)
+          .filter((id) => id != null))
+      );
+
+      // Fetch volunteer profiles (public endpoint) to get email/phone
+      const profiles = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const res = await api.getVolunteerById(id);
+            return [id, res?.data || {}];
+          } catch {
+            return [id, {}];
+          }
+        })
+      );
+
+      const contactById = new Map(profiles); // id -> volunteer object
+
+      // Helpers to pick email/phone robustly from the volunteer object
+      const pickEmail = (v = {}) =>
+        v.email || v.volunteer_email || v.contact_email || v.username || "";
+      const pickPhone = (v = {}) =>
+        v.phone || v.mobile || v.contact_number || (v.emergency_contact && (v.emergency_contact.phone || v.emergency_contact.mobile)) || "";
+
+      const rows = [
+        ["Volunteer Name", "Training", "Status", "Submitted At", "Volunteer Email", "Volunteer Phone"],
+        ...filteredEOIs.map((e) => {
+          const v = contactById.get(e.volunteer_id) || {};
+          return [
+            e.volunteer_name || "",
+            e.training_title || "",
+            e.status || "",
+            e.submitted_at || "",
+            pickEmail(v),
+            pickPhone(v),
+          ];
+        }),
+      ];
+
+      const csv = rows
+        .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const namePart = selectedTraining?.title ? selectedTraining.title.replace(/[^\w\-]+/g, "_") : "eoi";
+      a.href = url;
+      a.download = `EOIs_${namePart}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      speak("CSV downloaded.");
+    } catch (err) {
+      console.error("CSV export failed:", err);
+      setError("Failed to export CSV.");
+      speak("CSV export failed.");
+    }
   };
 
   // ---------- Capacity numbers ----------
@@ -340,7 +383,7 @@ const EOIList = () => {
             onClick={exportCSV}
             aria-label="Download current list as CSV"
           >
-            ⬇️ Download CSV
+            ⬇️ Download Report
           </button>
         </div>
       </header>

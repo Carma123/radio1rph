@@ -4,174 +4,264 @@ import { useNavigate, Link, NavLink } from "react-router-dom";
 import api from "../services/api";
 import icon from "./icon.png";
 
-/* Inline CSS injection using your requested design tokens + utilities */
+/* ================================
+   Inline CSS: polished + WCAG 2.1
+   ================================ */
 const DASHBOARD_STYLE_ID = "vtms-dashboard-styles";
 const injectStylesOnce = () => {
+  if (typeof document === "undefined") return;
   if (document.getElementById(DASHBOARD_STYLE_ID)) return;
   const css = `
 :root {
-  --bg: #f8fafc;
-  --text: #0f172a;
-  --muted: #475569;
+  /* Light theme tokens */
+  --bg: #f8fafc;          /* slate-50 */
+  --text: #0f172a;        /* slate-900 */
+  --muted: #475569;       /* slate-600 */
   --card: #ffffff;
-  --border: #e5e7eb;
-  --focus: #2563eb;
-  --primary: #2563eb;
-  --primary-ink: #ffffff;
-  --success: #16a34a;
-  --warn: #d97706;
-  --danger: #dc2626;
-  --badge-bg: #eef2ff;
-  --badge-txt: #3730a3;
-  --table-stripe: #f1f5f9;
+  --border: #e5e7eb;      /* gray-200 */
+  --focus: #2563eb;       /* blue-600 */
+  --primary: #2563eb;     /* blue-600 (AA on white) */
+  --success: #16a34a;     /* green-600 */
+  --warn: #b45309;        /* amber-700 (AA) */
+  --danger: #b91c1c;      /* red-700 (AA) */
+  --badge-bg: #eef2ff;    /* indigo-50 */
+  --badge-txt: #1e40af;   /* indigo-800 */
+  --table-stripe: #f1f5f9;/* slate-100 */
   --shadow: 0 10px 24px rgba(0,0,0,.08);
+
+  --radius-lg: 18px;
+  --radius-md: 12px;
+
+  --tap: 44px; /* min target size */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --text: #e5e7eb;
+    --muted: #cbd5e1;
+    --card: #0f172a;
+    --border: #1f2937;
+    --focus: #60a5fa;
+    --primary: #60a5fa;
+    --success: #22c55e;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --badge-bg: #111827;
+    --badge-txt: #bfdbfe;
+    --table-stripe: #0b1628;
+    --shadow: 0 10px 24px rgba(0,0,0,.45);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root { --primary:#1d4ed8; --focus:#1d4ed8; --border:#cbd5e1; }
 }
 
 /* Page shell */
-.dashboard-container { max-width: 1200px; margin: 0 auto; padding: 16px; background: var(--bg); color: var(--text); }
+.dashboard-container {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.55;
+}
 .dashboard-main { outline: none; }
 
-/* SR live */
-.sr-live, .sr-only { position: absolute; height: 1px; width: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-
-/* Navbar */
-.navbar{position:sticky;top:0;z-index:5;margin-bottom:16px}
-.navbar-inner{ background: #fff; border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow); overflow:hidden; }
-.navbar-top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px 16px}
-.navbar-brand-center{display:flex;align-items:center;gap:12px;justify-content:center;flex:1}
-.navbar-brand-center img{ height:40px;width:40px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border); box-shadow:0 4px 16px rgba(37,99,235,.18), inset 0 0 0 3px rgba(37,99,235,.06); }
-.navbar-title{font-weight:900;letter-spacing:.2px}
-.navbar-spacer{width:48px;height:48px}
-.navbar-toggle{ display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;border:1px solid var(--border); border-radius:12px;background:#fff;color:var(--text);cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06); }
-.navbar-toggle:hover{box-shadow:0 2px 6px rgba(0,0,0,.08)}
-.navbar-toggle:active{transform:scale(.98)}
-.navbar-toggle svg{display:block;width:22px;height:22px}
-.navbar-links{ display:flex;gap:10px;list-style:none;margin:0;padding:10px 12px;justify-content:center;border-top:1px solid var(--border);background:#fff; }
-.navbar-links li{display:flex}
-.navlink{ color:var(--text);text-decoration:none;padding:10px 14px;border-radius:999px;border:1px solid var(--border); background:#fff;transition:background .15s ease, transform .05s ease; font-weight:750;line-height:1; display:inline-flex; align-items:center; gap:8px; }
-.navlink:hover{background:#f3f4f6}
-.navlink:active{transform:scale(.98)}
-.navlink.active{outline:3px solid var(--focus); outline-offset:2px}
-.logout-button{ min-height:44px;padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:#0f172a;color:#fff;cursor:pointer;font-weight:800 }
-.logout-button:hover{filter:brightness(.95)}
-.navbar-toggle:focus-visible,.navlink:focus-visible,.logout-button:focus-visible,.btn:focus-visible,.link-button:focus-visible,.link-inline:focus-visible,.eoi__title:focus{ outline:3px solid var(--focus);outline-offset:2px }
-@media (min-width:721px){.navbar-toggle{display:none} .navbar-links{display:flex !important}}
-@media (max-width:720px){ .navbar-links{display:none;padding:10px} .navbar-links.open{display:flex;flex-direction:column;align-items:stretch} .navlink,.logout-button{width:100%} }
-
-/* Skip link */
-.skip-link{ position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden; }
-.skip-link:focus{ left:16px;top:10px;width:auto;height:auto;z-index:1000;background:#111827;color:#fff;padding:8px 12px;border-radius:8px; }
-
-/* Hero */
-.dashboard-hero{ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px; padding:24px;border-radius:18px;margin-bottom:16px;background: linear-gradient(135deg, #eef4ff 0%, #ffffff 100%); border:1px solid var(--border); box-shadow: var(--shadow); }
-.hero-icon{ height:72px;width:72px;border-radius:16px;object-fit:contain;background:#fff;border:1px solid var(--border); box-shadow:0 10px 26px rgba(30,64,175,.22), inset 0 0 0 4px rgba(37,99,235,.08); }
-.hero-title{font-size:1.8rem;margin:0;text-align:center}
-.hero-sub{color:var(--muted);font-size:.95rem;margin:0;text-align:center}
-
-/* Grid (make it a consistent 2-column layout on laptops/desktops) */
-.dashboard-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;align-items:start}
-.col-6{grid-column:span 6}
-.col-12{grid-column:span 12}
-
-/* On tablets: still 2 columns */
-@media (max-width:1100px){
-  .col-6{grid-column:span 6}
+/* A11y utilities */
+.sr-live, .sr-only {
+  position:absolute;height:1px;width:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap
 }
 
-/* On mobile: single centered column */
-@media (max-width:860px){
-  .dashboard-grid{grid-template-columns:1fr}
-  .col-6,.col-12{grid-column:1 / -1}
-  .card{max-width:560px;margin-left:auto;margin-right:auto}
+/* Skip link */
+.skip-link{
+  position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden
+}
+.skip-link:focus{
+  left:16px;top:10px;width:auto;height:auto;z-index:1000;background:#111827;color:#fff;padding:8px 12px;border-radius:8px
+}
+
+/* Navbar */
+.navbar{ position: sticky; top: 0; z-index: 10; margin-bottom: 16px; }
+.navbar-inner{
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow); overflow:hidden;
+  backdrop-filter: saturate(140%) blur(6px);
+}
+.navbar-top{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px 8px }
+.navbar-brand-center{ display:flex; align-items:center; gap:12px; justify-content:center; flex:1 }
+.navbar-brand-center img{
+  height:40px;width:40px;object-fit:contain;border-radius:10px;background:#fff;
+  border:1px solid var(--border); box-shadow: 0 4px 16px rgba(37,99,235,.18), inset 0 0 0 3px rgba(37,99,235,.06)
+}
+.navbar-title{ font-weight: 900; letter-spacing: .2px; }
+.navbar-spacer{ width: var(--tap); height: var(--tap); }
+
+.navbar-toggle{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:var(--tap); min-width:var(--tap);
+  border:1px solid var(--border); border-radius:12px;
+  background:var(--card); color:var(--text); cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,.06)
+}
+.navbar-toggle:hover{ box-shadow:0 2px 6px rgba(0,0,0,.12) }
+.navbar-toggle:active{ transform:scale(.98) }
+.navbar-toggle svg{ display:block; width:22px; height:22px }
+
+.navbar-links{
+  display:flex; gap:10px; list-style:none; margin:0; padding:10px 12px;
+  justify-content:center; border-top:1px solid var(--border); background:var(--card)
+}
+.navbar-links li{ display:flex }
+
+/* Nav links */
+.navlink{
+  color:var(--text); text-decoration:none; padding:10px 14px; min-height:var(--tap);
+  border-radius:999px; border:1px solid var(--border); background:var(--card);
+  transition: background .12s ease, transform .04s ease, box-shadow .12s ease, border-color .12s ease;
+  font-weight:750; line-height:1; display:inline-flex; align-items:center; gap:8px
+}
+.navlink:hover{ background:#eef2ff22; border-color:#dbeafe55; text-decoration:underline; text-underline-offset:3px }
+.navlink:active{ transform:scale(.98) }
+.navlink.active, .navlink[aria-current="page"]{ outline:3px solid var(--focus); outline-offset:2px }
+
+/* Logout button (button-like link) */
+.logout-button{
+  min-height:var(--tap); padding:10px 14px; border-radius:999px; border:1px solid var(--border);
+  background:#0f172a; color:#fff; cursor:pointer; font-weight:800
+}
+.logout-button:hover{ filter: brightness(.95) }
+.navbar-toggle:focus-visible,
+.navlink:focus-visible,
+.logout-button:focus-visible,
+.btn:focus-visible,
+.link-inline:focus-visible,
+.eoi__title:focus { outline:3px solid var(--focus); outline-offset:2px }
+
+/* Responsive nav */
+@media (min-width: 721px) { .navbar-toggle { display:none } .navbar-links { display:flex !important } }
+@media (max-width: 720px) {
+  .navbar-links{ display:none; padding:10px }
+  .navbar-links.open{ display:flex; flex-direction:column; align-items:stretch }
+  .navlink, .logout-button{ width:100% }
+}
+
+/* Hero */
+.dashboard-hero{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+  padding:28px; border-radius:var(--radius-lg); margin-bottom:16px;
+  background:linear-gradient(135deg, #eef4ff 0%, var(--card) 100%);
+  border:1px solid var(--border); box-shadow:var(--shadow)
+}
+.hero-icon{ height:72px; width:72px; border-radius:16px; object-fit:contain; background:#fff; border:1px solid var(--border); box-shadow: 0 10px 26px rgba(30,64,175,.22), inset 0 0 0 4px rgba(37,99,235,.08) }
+.hero-title{ font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); margin:0; text-align:center }
+.hero-sub{ color:var(--muted); font-size:1rem; margin:0; text-align:center }
+
+/* Grid: flexible, responsive */
+.dashboard-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap:16px; align-items:start
 }
 
 /* Card */
-.card{ background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px;box-shadow:var(--shadow); position:relative;overflow:hidden; }
-.card::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,#93c5fd,#60a5fa);}
-.card h2{font-size:1.1rem;margin:4px 0 10px 0;display:flex;align-items:center;gap:8px}
-.card h2 img{height:22px;width:22px;object-fit:contain;border-radius:6px;background:#fff;border:1px solid var(--border)}
-.card-content ul{margin:0;padding-left:18px}
+.card{
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:16px; box-shadow:var(--shadow); position:relative; overflow:hidden;
+  transition: transform .08s ease, box-shadow .14s ease, border-color .14s ease
+}
+.card::before{ content:""; position:absolute; inset:0 0 auto 0; height:6px; background:linear-gradient(90deg,#93c5fd,#60a5fa) }
+.card:hover{ transform: translateY(-2px); border-color:#bfdbfe; box-shadow:0 20px 40px rgba(2,6,23,.12) }
+@media (prefers-reduced-motion: reduce){ .card{ transition:none } }
+.card:focus-within{ outline:3px solid var(--focus); outline-offset:2px }
+.card h2{ font-size:1.12rem; margin:6px 0 10px; display:flex; align-items:center; gap:8px }
+.card h2 img{ height:22px; width:22px; object-fit:contain; border-radius:6px; background:#fff; border:1px solid var(--border) }
+.card-content ul{ margin:0; padding-left:18px }
 
 /* Buttons */
-.btn{border:1px solid transparent; padding:12px 16px; border-radius:10px; cursor:pointer; transition:transform .04s ease, box-shadow .12s ease; 
-     box-shadow:0 1px 0 rgba(0,0,0,.04); min-height:44px; font-weight:800; display:inline-flex; align-items:center; gap:8px; color:#fff;}
-.btn:hover { transform: translateY(-1px); }
-.btn:active { transform: translateY(0); }
-.btn:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-.btn.primary { background: var(--primary); color: #fff; }
-.btn.success { background: var(--success); color: #fff; }
-.btn.warn    { background: var(--warn);    color: #fff; }
-.btn.danger  { background: var(--danger);  color: #fff; }
-.btn.ghost   { background: #0f172a;        color: #fff; }
-.btn[disabled], .btn[aria-disabled="true"]{opacity:.65;cursor:not-allowed}
-/* NEW: block helper for small screens (bigger tap targets) */
-.btn.block { width: 100%; }
-@media (max-width: 560px) {
-  .row-actions .btn { width: 100%; }
+.btn{
+  border:1px solid transparent; padding:12px 16px; border-radius:12px; cursor:pointer;
+  transition: transform .04s ease, box-shadow .12s ease, filter .12s ease;
+  box-shadow:0 1px 0 rgba(0,0,0,.04); min-height:var(--tap);
+  font-weight:800; display:inline-flex; align-items:center; gap:8px; color:#fff
 }
+.btn:hover{ transform: translateY(-1px); filter:brightness(.98) }
+.btn:active{ transform: translateY(0) }
+.btn.primary{ background:var(--primary) }
+.btn.success{ background:var(--success) }
+.btn.warn{ background:var(--warn) }
+.btn.danger{ background:var(--danger) }
+.btn.ghost{ background:#0f172a }
+.btn[disabled], .btn[aria-disabled="true"]{ opacity:.65; cursor:not-allowed }
+.btn.block{ width:100% }
 
-/* Inline action link (WCAG-friendly; used for Certificate/Evidence) */
+/* Inline link button */
 .link-inline{
-  appearance:none;
-  background:none;
-  border:none;
-  color:#1d4ed8;            /* blue-700 on white: accessible */
-  text-decoration:underline;
-  font:inherit;
-  padding:.25rem .125rem;   /* increases target without pill background */
-  border-radius:6px;
-  cursor:pointer;
+  appearance:none; background:none; border:none; color:#1d4ed8; text-decoration:underline;
+  font:inherit; padding:.25rem .125rem; border-radius:6px; cursor:pointer
 }
-.link-inline:hover{ color:#1e40af; text-decoration-thickness:2px; }
-.link-inline:focus-visible{ outline:3px solid #93c5fd; outline-offset:2px; }
+.link-inline:hover{ color:#1e40af; text-decoration-thickness:2px }
+.link-inline:focus-visible{ outline:3px solid #93c5fd; outline-offset:2px }
 
 /* Messages */
-.alert{padding:12px 14px;border-radius:12px;margin:8px 0}
-.alert-error{background:#fef2f2;color:#7F1D1D;border:1px solid #fecaca}
+.alert{ padding:12px 14px; border-radius:12px; margin:8px 0 }
+.alert-error{ background:#fef2f2; color:#7F1D1D; border:1px solid #fecaca }
 
 /* Table */
-.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; }
-.eoi-table { width:100%; border-collapse: collapse; min-width: 720px; }
-.eoi-table th, .eoi-table td { text-align:left; padding:12px 14px; border-bottom:1px solid var(--border); vertical-align: middle; }
-.eoi-table thead th { font-weight:600; background:#fbfdff; }
-.eoi-table tbody tr:nth-child(odd) { background: var(--table-stripe); }
-.col-actions { width:1%; white-space:nowrap; }
-.table-hint { font-size:.9rem; color:var(--muted); padding:10px 12px; }
+.table-wrap{ background:var(--card); border:1px solid var(--border); border-radius:12px; overflow-x:auto }
+.eoi-table{ width:100%; border-collapse:collapse; min-width:720px }
+.eoi-table th, .eoi-table td{ text-align:left; padding:12px 14px; border-bottom:1px solid var(--border); vertical-align:middle }
+.eoi-table thead th{ font-weight:700; background:#fbfdff10 }
+.eoi-table tbody tr:nth-child(odd){ background:var(--table-stripe) }
+.col-actions{ width:1%; white-space:nowrap }
+.table-hint{ font-size:.95rem; color:var(--muted); padding:10px 12px }
 
 /* Status badges */
-.status-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--badge-bg);color:var(--badge-txt);
-  border:1px solid #e2e8f0;font-weight:600;font-size:.85rem;letter-spacing:.02em;text-transform:capitalize}
-.td-status.approved  .status-badge { background:#ecfdf5; color:#065f46; border-color:#d1fae5; }
-.td-status.pending   .status-badge { background:#fefce8; color:#713f12; border-color:#fde68a; }
-.td-status.standby   .status-badge { background:#eff6ff; color:#1e40af; border-color:#bfdbfe; }
-.td-status.rejected  .status-badge { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
-.td-status.cancelled .status-badge { background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
-
-/* Small utilities */
-.muted { color: var(--muted); }
-.row-actions { display:flex; gap:8px; flex-wrap:wrap; }
-.td-actions { white-space:nowrap; }
-@media (prefers-reduced-motion: reduce) { .btn { transition:none; } }
+.status-badge{
+  display:inline-block; padding:6px 10px; border-radius:999px; background:var(--badge-bg); color:var(--badge-txt);
+  border:1px solid #e2e8f0; font-weight:700; font-size:.92rem; letter-spacing:.02em; text-transform:capitalize
+}
+.td-status.approved  .status-badge { background:#ecfdf5; color:#065f46; border-color:#d1fae5 }
+.td-status.pending   .status-badge { background:#fefce8; color:#713f12; border-color:#fde68a }
+.td-status.standby   .status-badge { background:#eff6ff; color:#1e40af; border-color:#bfdbfe }
+.td-status.rejected  .status-badge { background:#fef2f2; color:#991b1b; border-color:#fecaca }
+.td-status.cancelled .status-badge { background:#e2e8f0; color:#0f172a; border-color:#cbd5e1 }
 
 /* Notices */
-.notice-list{margin:0;padding-left:18px}
-.notice-list li{margin:6px 0}
-.notice-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.badge-local { margin-left:8px; font-size:.8rem; background:#fff7ed; color:#9a3412; border:1px solid #fdba74; padding:0 8px; border-radius:999px; }
-.refresh-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.notice-list{ margin:0; padding-left:18px }
+.notice-list li{ margin:6px 0 }
+.badge-local{ margin-left:8px; font-size:.8rem; background:#fff7ed; color:#9a3412; border:1px solid #fdba74; padding:0 8px; border-radius:999px }
+.refresh-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px }
 
-/* Results list (inline styling) */
-.results-list{margin:0;padding-left:18px}
-.results-list li{margin:6px 0}
-.result-badge{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #e2e8f0;font-size:.82rem;font-weight:700;text-transform:capitalize;margin-left:6px}
-.result-badge.competent{background:#ecfdf5;color:#065f46;border-color:#d1fae5}
-.result-badge.not_yet_competent{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
-.result-badge.not_assessed{background:#f1f5f9;color:#0f172a;border-color:#e2e8f0}
-.result-badge.participated{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+/* Results */
+.results-list{ margin:0; padding-left:18px }
+.results-list li{ margin:6px 0 }
+.result-badge{
+  display:inline-block; padding:4px 10px; border-radius:999px; border:1px solid #e2e8f0;
+  font-size:.92rem; font-weight:800; text-transform:capitalize; margin-left:6px
+}
+.result-badge.competent{ background:#ecfdf5; color:#065f46; border-color:#d1fae5 }
+.result-badge.not_yet_competent{ background:#fff7ed; color:#9a3412; border-color:#fed7aa }
+.result-badge.not_assessed{ background:#f1f5f9; color:#0f172a; border-color:#e2e8f0 }
+.result-badge.participated{ background:#eff6ff; color:#1e40af; border-color:#bfdbfe }
 
-.small-links{display:inline-flex;gap:10px;margin-left:10px;align-items:baseline}
-.small-links a{color:#2563eb;text-decoration:underline}
-.small-links a:hover{text-decoration:none}
+/* Trainings */
+.trainings-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px }
+@media (max-width:900px){ .trainings-grid{ grid-template-columns:1fr } }
+.training-card{ border:1px solid var(--border); border-radius:14px; padding:12px; background:var(--card); box-shadow:var(--shadow) }
+.training-title{ font-weight:900; letter-spacing:.2px }
+.training-meta{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px }
+.training-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px }
+
+/* Motion + High contrast */
+@media (prefers-reduced-motion: reduce){ .btn, .navlink, .navbar-toggle, .card{ transition:none } }
+@media (forced-colors: active){
+  .card, .navbar-inner, .table-wrap, .status-badge { border:1px solid CanvasText }
+  .navlink:hover { outline:1px solid Highlight }
+  .btn { border:1px solid ButtonText }
+}
 `;
   const tag = document.createElement("style");
   tag.id = DASHBOARD_STYLE_ID;
@@ -179,44 +269,45 @@ const injectStylesOnce = () => {
   document.head.appendChild(tag);
 };
 
-/* ---- helpers for local fallback notices ---- */
+/* ------------ helpers ------------- */
 const daysUntil = (isoDate) => {
   if (!isoDate) return null;
   const today = new Date();
   const d = new Date(isoDate);
   const t0 = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
   const t1 = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const diff = (t1 - t0) / (1000 * 60 * 60 * 24);
-  return Math.round(diff);
+  return Math.round((t1 - t0) / (1000 * 60 * 60 * 24));
 };
 
-/* ---- protected file opener (uses volunteer JWT) ---- */
+/* Protected file opener (uses volunteer JWT) */
 const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
-
 function absoluteUrl(path) {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
+  return API_BASE + (path.startsWith("/") ? "" : "/") + path;
 }
-
 async function openProtectedFile(path, suggestedName = "file") {
   try {
     const url = absoluteUrl(path);
     if (!url) return;
-    const volToken = localStorage.getItem("vol_access_token");
+
+    // Use your api.js storage keys (vol_access), but accept legacy key too.
+    const volToken = localStorage.getItem("vol_access") || localStorage.getItem("vol_access_token");
     const res = await fetch(url, {
       method: "GET",
-      headers: volToken ? { Authorization: `Bearer ${volToken}` } : {},
+      headers: volToken ? { Authorization: "Bearer " + volToken } : {},
       credentials: "omit",
     });
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Download failed (${res.status}) ${text}`.trim());
+      let text = "";
+      try { text = await res.text(); } catch {}
+      throw new Error(("Download failed (" + res.status + ") " + text).trim());
     }
+
     const blob = await res.blob();
-    const filename =
-      (res.headers.get("content-disposition")?.match(/filename="?([^"]+)"?/)?.[1]) ||
-      suggestedName;
+    const cd = res.headers.get("content-disposition");
+    const filenameMatch = cd && cd.match(/filename="?([^"]+)"?/);
+    const filename = (filenameMatch && filenameMatch[1]) || suggestedName;
 
     const blobUrl = URL.createObjectURL(blob);
     const newTab = window.open(blobUrl, "_blank", "noopener,noreferrer");
@@ -235,6 +326,9 @@ async function openProtectedFile(path, suggestedName = "file") {
   }
 }
 
+/* ======================================
+   Component
+====================================== */
 const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
   const navigate = useNavigate();
   const [volunteer, setVolunteer] = useState(initialVolunteer || null);
@@ -243,11 +337,11 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
   const [trainings, setTrainings] = useState([]);
   const [submittedEOIs, setSubmittedEOIs] = useState([]);
 
-  // NEW: Training results list (from /volunteers/:id/training-results)
+  // Training results (from /volunteers/:id/training-results)
   const [results, setResults] = useState([]);
   const [resultsError, setResultsError] = useState("");
 
-  // Server notifications (expiry/expired)
+  // Notifications
   const [notifications, setNotifications] = useState([]);
   const [notifBusy, setNotifBusy] = useState(false);
 
@@ -261,10 +355,16 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
 
   useEffect(() => { injectStylesOnce(); }, []);
 
+  // Close menu on Escape (WCAG 2.1.1 Keyboard)
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") setMenuOpen(false); }
+    if (menuOpen) window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
   useEffect(() => {
     const storedVolunteer =
       initialVolunteer || JSON.parse(localStorage.getItem("volunteer"));
-
     if (!storedVolunteer || !storedVolunteer.volunteer_id) {
       navigate("/volunteer-login");
       return;
@@ -302,7 +402,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
       setSubmittedEOIs(eoisResponse.data || []);
       setNotifications(notifResponse.data || []);
 
-      // Try to fetch training results (if backend endpoint exists)
+      // Results
       try {
         const res = await api.getVolunteerTrainingResults(volunteerId);
         setResults(Array.isArray(res.data) ? res.data : []);
@@ -320,7 +420,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
     }
   };
 
-  /* ---------- client-side fallback notices (if server hasn't created any yet) ---------- */
+  /* ---------- client-side fallback notices ---------- */
   const trainingTitleById = useMemo(() => {
     const map = new Map();
     (trainings || []).forEach((t) => map.set(t.id, t.title));
@@ -334,34 +434,29 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
       const d = daysUntil(q.expiry_date);
       if (d === null) return;
 
-      const titleMap = {
-        90: "Qualification expiring in 90 days",
-        14: "Qualification expiring in 14 days",
-        0: "Qualification expired",
-      };
-      const trainingTitle = trainingTitleById.get(q.training_id) || `Training #${q.training_id}`;
+      const titleMap = { 90: "Qualification expiring in 90 days", 14: "Qualification expiring in 14 days", 0: "Qualification expired" };
+      const trainingTitle = trainingTitleById.get(q.training_id) || ("Training #" + q.training_id);
 
       if (d === 90 || d === 14 || d === 0) {
         out.push({
-          id: `local-${q.id}-${d}`,
+          id: "local-" + q.id + "-" + d,
           audience: "volunteer",
-          type: d === 0 ? "qualification_expired" : `qualification_expiry_t${d}`,
+          type: d === 0 ? "qualification_expired" : "qualification_expiry_t" + d,
           title: titleMap[d],
-          body:
-            d === 0
-              ? `Your "${trainingTitle}" qualification has expired today.`
-              : `Your "${trainingTitle}" qualification will expire in ${d} days.`,
+          body: d === 0
+            ? 'Your "' + trainingTitle + '" qualification has expired today.'
+            : 'Your "' + trainingTitle + '" qualification will expire in ' + d + " days.",
           meta: { qualification_id: q.id, training_id: q.training_id, expiry_date: q.expiry_date, local: true },
           created_at: new Date().toISOString(),
           read_at: null,
         });
       } else if (d < 0) {
         out.push({
-          id: `local-${q.id}-expired`,
+          id: "local-" + q.id + "-expired",
           audience: "volunteer",
           type: "qualification_expired",
           title: "Qualification expired",
-          body: `Your "${trainingTitle}" qualification expired ${Math.abs(d)} day(s) ago.`,
+          body: 'Your "' + trainingTitle + '" qualification expired ' + Math.abs(d) + " day(s) ago.",
           meta: { qualification_id: q.id, training_id: q.training_id, expiry_date: q.expiry_date, local: true },
           created_at: new Date().toISOString(),
           read_at: null,
@@ -372,13 +467,10 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
   }, [qualifications, trainingTitleById]);
 
   const mergedNotices = useMemo(() => {
-    const key = (n) => `${n.type}::${n?.meta?.qualification_id || "na"}`;
+    const key = (n) => (n.type + "::" + (n?.meta?.qualification_id ?? "na"));
     const map = new Map();
     (notifications || []).forEach((n) => map.set(key(n), n));
-    (localNotices || []).forEach((n) => {
-      const k = key(n);
-      if (!map.has(k)) map.set(k, n);
-    });
+    (localNotices || []).forEach((n) => { const k = key(n); if (!map.has(k)) map.set(k, n); });
     return Array.from(map.values()).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
   }, [notifications, localNotices]);
 
@@ -388,8 +480,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
     submittedEOIs.some((e) => e.training_id === trainingId && e.status !== "cancelled");
 
   const formatDate = (d) => (d ? new Date(d).toLocaleDateString() : "N/A");
-
-  const titleOf = (trainingId) => trainingTitleById.get(trainingId) || `Training #${trainingId}`;
+  const titleOf = (trainingId) => trainingTitleById.get(trainingId) || ("Training #" + trainingId);
 
   const recentWins = useMemo(() => {
     const wins = [];
@@ -397,32 +488,30 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
       const when = r.date_assessed ? new Date(r.date_assessed) : null;
       const days = when ? Math.floor((Date.now() - when.getTime()) / (1000 * 60 * 60 * 24)) : null;
       if (days !== null && days <= 30) {
-        if (r.result === "competent") {
-          wins.push({ type: "competent", title: titleOf(r.training_id), date: r.date_assessed });
-        } else if (r.result === "participated") {
-          wins.push({ type: "participated", title: titleOf(r.training_id), date: r.date_assessed });
-        }
+        if (r.result === "competent") wins.push({ type: "competent", title: titleOf(r.training_id), date: r.date_assessed });
+        else if (r.result === "participated") wins.push({ type: "participated", title: titleOf(r.training_id), date: r.date_assessed });
       }
     });
     return wins.slice(0, 5);
   }, [results]);
 
+  /* ---------- Actions ---------- */
   const handleSubmitEOI = async (trainingId, trainingTitle) => {
-    if (!volunteer || !volunteer.volunteer_id || hasSubmitted(trainingId)) return;
+    if (!volunteer?.volunteer_id || hasSubmitted(trainingId)) return;
     setEoiBusyId(trainingId);
     try {
       const response = await api.submitEOI(volunteer.volunteer_id, trainingId);
       if (response.data?.error) {
-        setLiveMsg(`Error submitting EOI for ${trainingTitle}.`);
-        alert(`Error: ${response.data.error}`);
+        setLiveMsg("Error submitting EOI for " + trainingTitle + ".");
+        alert("Error: " + response.data.error);
       } else {
-        setLiveMsg(`EOI submitted for ${trainingTitle}.`);
+        setLiveMsg("EOI submitted for " + trainingTitle + ".");
         const updatedEOIs = await api.getVolunteerEOIs(volunteer.volunteer_id);
         setSubmittedEOIs(updatedEOIs.data || []);
       }
     } catch (err) {
       console.error(err);
-      setLiveMsg(`Failed to submit EOI for ${trainingTitle}.`);
+      setLiveMsg("Failed to submit EOI for " + trainingTitle + ".");
       alert("Failed to submit EOI. Check console for details.");
     } finally {
       setEoiBusyId(null);
@@ -436,10 +525,10 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
       await api.cancelEOI(eoiId);
       const updatedEOIs = await api.getVolunteerEOIs(volunteer.volunteer_id);
       setSubmittedEOIs(updatedEOIs.data || []);
-      setLiveMsg(`EOI cancelled for ${trainingTitle}.`);
+      setLiveMsg("EOI cancelled for " + trainingTitle + ".");
     } catch (err) {
       console.error(err);
-      setLiveMsg(`Failed to cancel EOI for ${trainingTitle}.`);
+      setLiveMsg("Failed to cancel EOI for " + trainingTitle + ".");
       alert("Failed to cancel EOI. See console for details.");
     } finally {
       setCancelBusyId(null);
@@ -450,9 +539,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
     setNotifBusy(true);
     try {
       await api.markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
-      );
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
     } catch (e) {
       console.error("Failed to mark notification read", e);
     } finally {
@@ -461,22 +548,21 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
   };
 
   const triggerReminderRefresh = async () => {
-  setRefreshBusy(true);
-  try {
-    await api.runReminderCheck(); // now hits /qualifications/reminders/run
-    const res = await api.getVolunteerNotifications(volunteer.volunteer_id);
-    setNotifications(res.data || []);
-    setLiveMsg("Reminders refreshed.");
-  } catch (e) {
-    console.error(e);
-    const serverMsg = e?.response?.data?.error;
-    alert(serverMsg || "Couldn't refresh reminders. Check server logs.");
-    setLiveMsg("Could not refresh reminders.");
-  } finally {
-    setRefreshBusy(false);
-  }
-};
-
+    setRefreshBusy(true);
+    try {
+      await api.runReminderCheck(); // server-side refresh
+      const res = await api.getVolunteerNotifications(volunteer.volunteer_id);
+      setNotifications(res.data || []);
+      setLiveMsg("Reminders refreshed.");
+    } catch (e) {
+      console.error(e);
+      const serverMsg = e?.response?.data?.error;
+      alert(serverMsg || "Couldn't refresh reminders. Check server logs.");
+      setLiveMsg("Could not refresh reminders.");
+    } finally {
+      setRefreshBusy(false);
+    }
+  };
 
   if (!volunteer) return null;
   if (loading) return <p className="dashboard-container">Loading dashboard…</p>;
@@ -484,7 +570,6 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
   return (
     <div className="dashboard-container">
       <a href="#main-content" className="skip-link">Skip to main content</a>
-
       <div role="status" aria-live="polite" className="sr-live">{liveMsg}</div>
 
       <VolunteerNavbar
@@ -504,18 +589,18 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
 
         {error && <div className="alert alert-error" role="alert">❗ {error}</div>}
 
-        <div className="dashboard-grid">
-          {/* Row 1: Personal Info + Attendance */}
-          <section className="card col-6" tabIndex="0" aria-labelledby="personal-info-title">
+        <div className="dashboard-grid" role="region" aria-label="Volunteer dashboard sections">
+          {/* Personal Info */}
+          <section className="card" tabIndex={0} aria-labelledby="personal-info-title">
             <h2 id="personal-info-title">
-              <img src={icon} alt="" aria-hidden="true" /> 👤 Personal Info
+              <img src={icon} alt="" aria-hidden="true" /> <span aria-hidden="true">👤</span> Personal Info
             </h2>
             <div className="card-content">
               <p><strong>Email:</strong> {volunteer?.email}</p>
               <p><strong>Volunteer ID:</strong> {volunteer?.volunteer_id}</p>
               <p><strong>Phone:</strong> {volunteer?.phone || "Not provided"} </p>
-              <div style={{marginTop:8}}>
-                <span className="status-badge">✅ Active Volunteer</span>
+              <div style={{ marginTop: 8 }}>
+                <span className="status-badge" aria-label="Status: Active Volunteer">✅ Active Volunteer</span>
               </div>
               <Link to="/volunteer/profile" className="btn ghost" aria-label="Edit Profile">
                 ⚙️ Edit Profile
@@ -523,9 +608,10 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
             </div>
           </section>
 
-          <section className="card col-6" tabIndex="0" aria-labelledby="attendance-title">
+          {/* Attendance */}
+          <section className="card" tabIndex={0} aria-labelledby="attendance-title">
             <h2 id="attendance-title">
-              <img src={icon} alt="" aria-hidden="true" /> 🕒 Attendance History
+              <img src={icon} alt="" aria-hidden="true" /> <span aria-hidden="true">🕒</span> Attendance History
             </h2>
             <div className="card-content">
               {attendance.length === 0 ? (
@@ -535,14 +621,10 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                   {attendance.map((item) => (
                     <li key={item.id}>
                       <strong>Clock-in:</strong>{" "}
-                      {item.clock_in ? (
-                        <time dateTime={item.clock_in}>{item.clock_in}</time>
-                      ) : "N/A"}
+                      {item.clock_in ? <time dateTime={item.clock_in}>{item.clock_in}</time> : "N/A"}
                       {", "}
                       <strong>Clock-out:</strong>{" "}
-                      {item.clock_out ? (
-                        <time dateTime={item.clock_out}>{item.clock_out}</time>
-                      ) : "N/A"}
+                      {item.clock_out ? <time dateTime={item.clock_out}>{item.clock_out}</time> : "N/A"}
                     </li>
                   ))}
                 </ul>
@@ -556,10 +638,10 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
             </div>
           </section>
 
-          {/* Row 2: Qualifications + Alerts */}
-          <section className="card col-6" tabIndex="0" aria-labelledby="quals-title">
+          {/* Qualifications */}
+          <section className="card" tabIndex={0} aria-labelledby="quals-title">
             <h2 id="quals-title">
-              <img src={icon} alt="" aria-hidden="true" /> 🎖️ Qualifications / Courses
+              <img src={icon} alt="" aria-hidden="true" /> <span aria-hidden="true">🎖️</span> Qualifications / Courses
             </h2>
             <div className="card-content">
               {qualifications.length === 0 ? (
@@ -570,11 +652,11 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                     <li key={q.id}>
                       Training ID: {q.training_id}, Issued: {q.issue_date || "N/A"}, Expiry: {q.expiry_date || "N/A"}
                       {q.document_path && (
-                        <span className="small-links">
+                        <span className="small-links" style={{ marginLeft: 10 }}>
                           <button
                             type="button"
                             className="link-inline"
-                            onClick={() => openProtectedFile(q.document_path, `qualification-${q.id}.pdf`)}
+                            onClick={() => openProtectedFile(q.document_path, "qualification-" + q.id + ".pdf")}
                           >
                             View Certificate
                           </button>
@@ -585,7 +667,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                 </ul>
               )}
 
-              <div className="row-actions" style={{marginTop:10}}>
+              <div className="row-actions" style={{ marginTop: 10 }}>
                 <Link
                   to={`/volunteers/${volunteer?.volunteer_id}/qualifications`}
                   className="btn primary block"
@@ -603,18 +685,24 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                 >
                   ➕ Add / Upload Qualification
                 </Link>
-
               </div>
             </div>
           </section>
 
-          <section className="card col-6" tabIndex="0" aria-labelledby="alerts-title">
+          {/* Alerts & Reminders */}
+          <section className="card" tabIndex={0} aria-labelledby="alerts-title">
             <h2 id="alerts-title">
-              <img src={icon} alt="" aria-hidden="true" /> 🔔 Alerts & Reminders
+              <img src={icon} alt="" aria-hidden="true" /> <span aria-hidden="true">🔔</span> Alerts & Reminders
             </h2>
             <div className="card-content">
               <div className="refresh-row">
-                <button className="btn ghost" onClick={triggerReminderRefresh} disabled={refreshBusy} aria-busy={refreshBusy ? "true" : "false"}>
+                <button
+                  className="btn ghost"
+                  onClick={triggerReminderRefresh}
+                  disabled={refreshBusy}
+                  aria-busy={refreshBusy ? "true" : "false"}
+                  type="button"
+                >
                   {refreshBusy ? "Refreshing…" : "↻ Refresh reminders"}
                 </button>
                 {anyLocal && (
@@ -631,26 +719,22 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                   <ul className="notice-list">
                     {mergedNotices.map((n) => (
                       <li key={n.id}>
-                        {n.read_at ? "✓ " : "⏰ "}
+                        <span aria-hidden="true">{n.read_at ? "✓ " : "⏰ "}</span>
                         <strong>{n.title}</strong>
-                        {n.body ? ` — ${n.body}` : ""}
-                        {n.meta?.expiry_date && (
-                          <>
-                            {" "}
-                            <em className="muted">(Expiry: {formatDate(n.meta.expiry_date)})</em>
-                          </>
-                        )}
+                        {n.body ? " — " + n.body : ""}
+                        {n.meta?.expiry_date && <> <em className="muted">(Expiry: {formatDate(n.meta.expiry_date)})</em></>}
                         {!n.read_at && !n?.meta?.local && (
                           <button
                             className="btn ghost"
-                            style={{marginLeft:8, padding: "6px 10px"}}
+                            style={{ marginLeft: 8, padding: "6px 10px" }}
                             onClick={() => markNoticeRead(n.id)}
                             disabled={notifBusy}
+                            type="button"
                           >
                             Mark read
                           </button>
                         )}
-                        {n?.meta?.local && <span className="badge-local">preview</span>}
+                        {n?.meta?.local && <span className="badge-local" aria-label="Local preview notice">preview</span>}
                       </li>
                     ))}
                   </ul>
@@ -662,17 +746,17 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
             </div>
           </section>
 
-          {/* Row 3: Trainings + My EOIs */}
-          <section className="card col-6" tabIndex="0" aria-labelledby="trainings-title">
+          {/* Available Trainings */}
+          <section className="card" tabIndex={0} aria-labelledby="trainings-title">
             <h2 id="trainings-title">
-              <img src={icon} alt="" aria-hidden="true" /> 🎯 Available Trainings / Courses
+              <img src={icon} alt="" aria-hidden="true" /> <span aria-hidden="true">🎯</span> Available Training / Courses
             </h2>
             <div className="card-content">
               {trainings.length === 0 ? (
-                <p>No trainings available.</p>
+                <p>No training available.</p>
               ) : (
                 <div className="trainings-grid" role="list" aria-labelledby="trainings-heading">
-                  <h3 id="trainings-heading" className="sr-only">Available Trainings list</h3>
+                  <h3 id="trainings-heading" className="sr-only">Available Training list</h3>
                   {trainings.map((t) => {
                     const disabled = hasSubmitted(t.id) || eoiBusyId === t.id;
                     const label = hasSubmitted(t.id)
@@ -685,11 +769,11 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                     return (
                       <article key={t.id} role="listitem" className="training-card" aria-labelledby={`training-${t.id}-title`}>
                         <div className="training-title" id={`training-${t.id}-title`}>{t.title}</div>
-                        <div className="training-meta">
-                          <span className="status-badge">📚 {t.type}</span>
-                          {t.capacity != null && <span className="status-badge">🪑 Capacity: {t.capacity}</span>}
+                        <div className="training-meta" aria-label="Training metadata">
+                          <span className="status-badge" aria-label={`Type: ${t.type || "Training"}`}>📚 {t.type}</span>
+                          {t.capacity != null && <span className="status-badge" aria-label={`Capacity ${t.capacity}`}>🪑 Capacity: {t.capacity}</span>}
                         </div>
-                        <div className="training-meta" style={{marginTop:6}}>
+                        <div className="training-meta" style={{ marginTop: 6 }}>
                           <strong>Dates:</strong>{" "}
                           <time dateTime={startISO}>{formatDate(startISO)}</time>
                           {" "}–{" "}
@@ -704,6 +788,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                             aria-busy={eoiBusyId === t.id ? "true" : "false"}
                             aria-label={`${label} for ${t.title}`}
                             title={label}
+                            type="button"
                           >
                             {hasSubmitted(t.id) ? "✅ EOI Submitted" : "✉️ Submit EOI"}
                           </button>
@@ -719,9 +804,10 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
             </div>
           </section>
 
-          <section className="card col-6" tabIndex="0" aria-labelledby="myeois-title">
+          {/* My EOIs */}
+          <section className="card" tabIndex={0} aria-labelledby="myeois-title">
             <h2 id="myeois-title">
-              <img src={icon} alt="" aria-hidden="true" /> 📨 My EOIs
+              <img src={icon} alt="" aria-hidden="true" /> <span aria-hidden="true">📨</span> My EOIs
             </h2>
             <div className="card-content">
               {submittedEOIs.length === 0 ? (
@@ -729,6 +815,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
               ) : (
                 <div className="table-wrap" role="region" aria-label="My EOIs table">
                   <table className="eoi-table">
+                    <caption className="sr-only">Expressions of Interest you have submitted</caption>
                     <thead>
                       <tr>
                         <th scope="col">Training</th>
@@ -759,11 +846,12 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                                 aria-busy={cancelBusyId === e.id ? "true" : "false"}
                                 aria-label={`Cancel EOI for ${e.training_title}`}
                                 title="Cancel EOI"
+                                type="button"
                               >
                                 {cancelBusyId === e.id ? "… Cancelling" : "🗑️ Cancel"}
                               </button>
                             ) : (
-                              <button className="btn ghost" disabled aria-disabled="true" title="No actions available">
+                              <button className="btn ghost" disabled aria-disabled="true" title="No actions available" type="button">
                                 No action
                               </button>
                             )}
@@ -778,14 +866,13 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
             </div>
           </section>
 
-          {/* Row 4: My Training Results + Achievements */}
-          <section className="card col-6" tabIndex="0" aria-labelledby="results-title">
+          {/* My Training Results */}
+          <section className="card" tabIndex={0} aria-labelledby="results-title">
             <h2 id="results-title">
-              <img src={icon} alt="" aria-hidden="true" /> 🧪 My Training Results
+              <img src={icon} alt="" aria-hidden="true" /> <span aria-hidden="true">🧪</span> My Training Results
             </h2>
             <div className="card-content">
               {resultsError && <p className="muted">({resultsError})</p>}
-
               {(!results || results.length === 0) ? (
                 <p>No results recorded yet.</p>
               ) : (
@@ -796,16 +883,14 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                       <span className={`result-badge ${r.result || "not_assessed"}`}>
                         {pretty(r.result)}
                       </span>
-                      {r.date_assessed && (
-                        <> — <em className="muted">Assessed: {formatDate(r.date_assessed)}</em></>
-                      )}
+                      {r.date_assessed && <> — <em className="muted">Assessed: {formatDate(r.date_assessed)}</em></>}
                       {r.assessor_name && <> — <span className="muted">Assessor: {r.assessor_name}</span></>}
-                      <span className="small-links">
+                      <span className="small-links" style={{ marginLeft: 10 }}>
                         {r.certificate_path && (
                           <button
                             type="button"
                             className="link-inline"
-                            onClick={() => openProtectedFile(r.certificate_path, `certificate-${r.id}.pdf`)}
+                            onClick={() => openProtectedFile(r.certificate_path, "certificate-" + r.id + ".pdf")}
                           >
                             Certificate
                           </button>
@@ -814,15 +899,15 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                           <button
                             type="button"
                             className="link-inline"
-                            onClick={() => openProtectedFile(r.evidence_path, `evidence-${r.id}`)}
+                            onClick={() => openProtectedFile(r.evidence_path, "evidence-" + r.id)}
                           >
                             Evidence
                           </button>
                         )}
                       </span>
-                      {r.notes && <div className="muted" style={{marginTop:4}}>Notes: {r.notes}</div>}
+                      {r.notes && <div className="muted" style={{ marginTop: 4 }}>Notes: {r.notes}</div>}
                       {r.result === "not_yet_competent" && r.next_opportunity && (
-                        <div className="muted" style={{marginTop:4}}>
+                        <div className="muted" style={{ marginTop: 4 }}>
                           Next opportunity expected: {formatDate(r.next_opportunity)}
                         </div>
                       )}
@@ -833,9 +918,10 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
             </div>
           </section>
 
-          <section className="card col-6" tabIndex="0" aria-labelledby="achievements-title">
+          {/* Achievements */}
+          <section className="card" tabIndex={0} aria-labelledby="achievements-title">
             <h2 id="achievements-title">
-              <img src={icon} alt="" aria-hidden="true" /> 🏅 Recent Achievements
+              <img src={icon} alt="" aria-hidden="true" /> <span aria-hidden="true">🏅</span> Recent Achievements
             </h2>
             <div className="card-content">
               {recentWins.length === 0 ? (
@@ -844,7 +930,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                 <ul>
                   {recentWins.map((a, idx) => (
                     <li key={idx}>
-                      {a.type === "competent" ? "🎉 " : "👏 "}
+                      <span aria-hidden="true">{a.type === "competent" ? "🎉 " : "👏 "}</span>
                       {a.type === "competent" ? (
                         <>Congratulations on achieving <strong>Competent</strong> in <em>{a.title}</em>!</>
                       ) : (
@@ -855,7 +941,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
                   ))}
                 </ul>
               )}
-              <p className="table-hint">This mirrors the acknowledgement in notifications (Section 9.2).</p>
+              <p className="table-hint">This mirrors the acknowledgement in notifications.</p>
             </div>
           </section>
         </div>
@@ -867,7 +953,7 @@ const VolunteerDashboard = ({ volunteer: initialVolunteer, onLogout }) => {
 /* Navbar */
 const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
   const toggleLabel = menuOpen ? "Close menu" : "Open menu";
-  const linkClass = ({ isActive }) => `navlink ${isActive ? "active" : ""}`;
+  const linkClass = ({ isActive }) => "navlink " + (isActive ? "active" : "");
   const closeMenu = () => setMenuOpen(false);
 
   return (
@@ -881,6 +967,7 @@ const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
             aria-controls="navbar-links"
             onClick={() => setMenuOpen(!menuOpen)}
             title={toggleLabel}
+            type="button"
           >
             {menuOpen ? (
               <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
@@ -901,11 +988,7 @@ const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
           <div className="navbar-spacer" aria-hidden="true"></div>
         </div>
 
-        <ul
-          id="navbar-links"
-          className={`navbar-links ${menuOpen ? "open" : ""}`}
-          role="menubar"
-        >
+        <ul id="navbar-links" className={"navbar-links " + (menuOpen ? "open" : "")} role="menubar">
           <li role="none">
             <NavLink to="/volunteer/dashboard" className={linkClass} role="menuitem" onClick={closeMenu}>
               🏠 Dashboard
@@ -913,7 +996,7 @@ const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
           </li>
           <li role="none">
             <NavLink
-              to={volunteerId ? `/volunteers/${volunteerId}/attendance` : "#"}
+              to={volunteerId ? ("/volunteers/" + volunteerId + "/attendance") : "#"}
               className={linkClass}
               role="menuitem"
               onClick={closeMenu}
@@ -923,7 +1006,7 @@ const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
           </li>
           <li role="none">
             <NavLink
-              to={volunteerId ? `/volunteers/${volunteerId}/qualifications` : "#"}
+              to={volunteerId ? ("/volunteers/" + volunteerId + "/qualifications") : "#"}
               className={linkClass}
               role="menuitem"
               onClick={closeMenu}
@@ -931,15 +1014,10 @@ const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
               🎖️ Qualifications
             </NavLink>
           </li>
-          {/* keep volunteers on the volunteer dashboard for trainings */}
           <li role="none">
-            <a
-              href="/volunteer/dashboard#trainings-title"
-              className="navlink"
-              role="menuitem"
-              onClick={closeMenu}
-            >
-              🎯 Trainings / Submit EOI
+            {/* keep volunteers on the dashboard for training */}
+            <a href="/volunteer/dashboard#trainings-title" className="navlink" role="menuitem" onClick={closeMenu}>
+              🎯 Training / Submit EOI
             </a>
           </li>
           <li role="none">
@@ -953,7 +1031,7 @@ const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
             </NavLink>
           </li>
           <li role="none">
-            <button onClick={onLogout} className="logout-button" role="menuitem" title="Logout">
+            <button onClick={onLogout} className="logout-button" role="menuitem" title="Logout" type="button">
               🚪 Logout
             </button>
           </li>
@@ -963,6 +1041,7 @@ const VolunteerNavbar = ({ onLogout, volunteerId, menuOpen, setMenuOpen }) => {
   );
 };
 
+/* Pretty-print results */
 function pretty(v) {
   switch (v) {
     case "competent": return "Competent";

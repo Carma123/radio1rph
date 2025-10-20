@@ -376,6 +376,7 @@ const TrainingResultsAdmin = () => {
             >
               <option value="competent">Competent</option>
               <option value="participated">Participated</option>
+              <option value="did_not_attend">Did Not Attend</option>
               <option value="not_yet_competent">Not Yet Competent</option>
               <option value="not_assessed">Not Assessed</option>
             </select>
@@ -541,6 +542,7 @@ const TrainingResultsAdmin = () => {
                           >
                             <option value="competent">Competent</option>
                             <option value="participated">Participated</option>
+                            <option value="did_not_attend">Did Not Attend</option>
                             <option value="not_yet_competent">Not Yet Competent</option>
                             <option value="not_assessed">Not Assessed</option>
                           </select>
@@ -702,6 +704,8 @@ const prettyResult = (v) =>
     ? "Not Yet Competent"
     : v === "not_assessed"
     ? "Not Assessed"
+    : v === "did_not_attend"
+    ? "Did Not Attend"
     : v.charAt(0).toUpperCase() + v.slice(1);
 
 const badgeClass = (v) => {
@@ -710,6 +714,8 @@ const badgeClass = (v) => {
       return "bdg-ok";
     case "participated":
       return "bdg-info";
+    case "did_not_attend":
+      return "bdg-danger";
     case "not_yet_competent":
       return "bdg-warn";
     case "not_assessed":
@@ -763,6 +769,7 @@ const StyleBlock = () => (
   .bdg-info{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
   .bdg-warn{background:#fefce8;color:#713f12;border-color:#fde68a}
   .bdg-neutral{background:#f1f5f9;color:#475569;border-color:#e2e8f0}
+  .bdg-danger{background:#fef2f2;color:#7f1d1d;border-color:#fecaca}
   .doc-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
   .file{position:absolute;inset:0;opacity:0;cursor:pointer}
   .link{color:var(--primary);text-decoration:underline}

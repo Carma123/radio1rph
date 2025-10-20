@@ -20,7 +20,10 @@ import EOIList from "./components/EOIList";
 import AdminCoursePanel from "./components/AdminCoursePanel";
 import TrainingResultsAdmin from "./components/TrainingResultsAdmin";
 
-// 🔐 Admin password reset (single page only)
+// Admin Reminders page
+import AdminReminders from "./components/AdminReminders";
+
+// Admin password reset
 import AdminResetPassword from "./components/AdminResetPassword";
 
 // Volunteer components
@@ -29,11 +32,11 @@ import VolunteerRegister from "./components/VolunteerRegister";
 import VolunteerDashboard from "./components/VolunteerDashboard";
 import VolunteerProfile from "./components/VolunteerProfile";
 
-// 🔐 Volunteer password reset (forgot + reset)
+// Volunteer password reset (forgot + reset)
 import VolunteerForgotPassword from "./components/VolunteerForgotPassword";
 import VolunteerResetPassword from "./components/VolunteerResetPassword";
 
-// NEW: volunteer add/edit form
+// Volunteer add/edit form
 import VolunteerAddQualification from "./components/VolunteerAddQualification";
 
 /** Safely parse JSON from localStorage */
@@ -133,7 +136,7 @@ function App() {
         <Route path="/admin-login" element={<AdminLogin onLogin={handleAdminLogin} />} />
         <Route path="/admin-register" element={<AdminRegister />} />
 
-        {/* 🔐 Admin password reset (no separate "forgot" page) */}
+        {/* Admin password reset (no separate "forgot" page) */}
         <Route path="/admin-reset-password" element={<AdminResetPassword />} />
 
         {/* -------------------- Admin Protected Routes -------------------- */}
@@ -155,8 +158,12 @@ function App() {
           }
         />
 
+        {/* Trainings (admin) */}
         <Route path="/trainings" element={AdminGuard(<TrainingsList />)} />
         <Route path="/trainings/add" element={AdminGuard(<TrainingForm />)} />
+
+        {/* Admin Reminders */}
+        <Route path="/admin/reminders" element={AdminGuard(<AdminReminders />)} />
 
         {/* Qualifications entry point: list volunteers with link to their quals (admin area) */}
         <Route
@@ -180,21 +187,19 @@ function App() {
 
         {/* Volunteer-friendly Add/Edit (no id in URL, volunteers only) */}
         <Route
-        path="/volunteer/qualifications/add"
-        element={VolunteerGuard(<VolunteerAddQualification />)}
+          path="/volunteer/qualifications/add"
+          element={VolunteerGuard(<VolunteerAddQualification />)}
         />
 
         {/* Dual route: if admin hits it, show admin form; if volunteer hits it, show volunteer form */}
         <Route
-        path="/volunteers/:volunteerId/qualifications/add"
-        element={
-          adminLoggedIn
-            ? AdminGuard(<AddQualification />)
-            : VolunteerGuard(<VolunteerAddQualification />)
-        }
+          path="/volunteers/:volunteerId/qualifications/add"
+          element={
+            adminLoggedIn
+              ? AdminGuard(<AddQualification />)
+              : VolunteerGuard(<VolunteerAddQualification />)
+          }
         />
-
-
 
         {/* EOIs (Admin) */}
         <Route path="/admin/eois" element={AdminGuard(<EOIList />)} />
@@ -205,7 +210,7 @@ function App() {
           element={AdminGuard(<AdminCoursePanel />)}
         />
 
-        {/* NEW: Training Results (Admin) */}
+        {/* Training Results (Admin) */}
         <Route
           path="/admin/trainings/:trainingId/results"
           element={AdminGuard(<TrainingResultsAdmin />)}
@@ -222,7 +227,7 @@ function App() {
         />
         <Route path="/volunteer-register" element={<VolunteerRegister />} />
 
-        {/* 🔐 Volunteer password reset flow */}
+        {/* Volunteer password reset flow */}
         <Route path="/volunteer-forgot-password" element={<VolunteerForgotPassword />} />
         <Route path="/volunteer-reset-password" element={<VolunteerResetPassword />} />
 
@@ -245,7 +250,7 @@ function App() {
           path="/"
           element={
             adminLoggedIn ? (
-              <Navigate to="/trainings" />
+              <Navigate to="/admin/reminders" />
             ) : volunteer ? (
               <Navigate to="/volunteer/dashboard" />
             ) : (

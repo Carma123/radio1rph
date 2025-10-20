@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import "./VolunteerLogin.css";
 
-/* Inline icons (same vibe as AdminLogin) */
+/* Inline icons */
 const IconMail = (props) => (
   <svg aria-hidden="true" viewBox="0 0 24 24" className="auth-icon" {...props}>
     <path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h15A2.5 2.5 0 0 1 22 6.5v11A2.5 2.5 0 0 1 19.5 20h-15A2.5 2.5 0 0 1 2 17.5v-11Zm2.3-.4 7.08 5.16a1 1 0 0 0 1.24 0L19.7 6.1M20 8.2l-6.54 4.76a3 3 0 0 1-3.64 0L3.3 8.2" />
@@ -23,6 +23,7 @@ const VolunteerLogin = ({ onLogin }) => {
   // fields
   const emailRef = useRef(null);
   const liveRef = useRef(null);
+  const speakTimeoutRef = useRef(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,20 +34,34 @@ const VolunteerLogin = ({ onLogin }) => {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // forgot password (inline panel like AdminLogin)
+  // forgot password (inline panel)
   const [showForgot, setShowForgot] = useState(false);
   const [fpEmail, setFpEmail] = useState("");
   const [fpBusy, setFpBusy] = useState(false);
   const [fpMsg, setFpMsg] = useState("");
 
   const speak = (msg) => {
-    if (!liveRef.current) return;
-    liveRef.current.textContent = "";
-    setTimeout(() => (liveRef.current.textContent = msg), 10);
+    if (speakTimeoutRef.current) {
+      clearTimeout(speakTimeoutRef.current);
+      speakTimeoutRef.current = null;
+    }
+    const node = liveRef.current;
+    if (!node) return;
+    node.textContent = "";
+    speakTimeoutRef.current = setTimeout(() => {
+      if (liveRef.current) liveRef.current.textContent = msg;
+      speakTimeoutRef.current = null;
+    }, 50);
   };
 
   useEffect(() => {
     emailRef.current?.focus();
+    return () => {
+      if (speakTimeoutRef.current) {
+        clearTimeout(speakTimeoutRef.current);
+        speakTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   const handleSubmit = async (e) => {
@@ -54,28 +69,47 @@ const VolunteerLogin = ({ onLogin }) => {
     setError("");
     setSuccess("");
 
-    if (!email || !password) {
-      setError("Please enter both email and password.");
+    const payload = {
+      email: (email || "").trim().toLowerCase(),
+      password: password || "",
+    };
+
+    if (!payload.email || !payload.password) {
+      const msg = "Please enter both email and password.";
+      setError(msg);
+      speak(msg);
       return;
     }
 
     setLoading(true);
     try {
-      const res = await api.loginVolunteer({ email, password });
+      const res = await api.loginVolunteer(payload);
       if (onLogin) {
         const { volunteer_id, name, email: vEmail, emergency_contact } = res.data || {};
         onLogin({ volunteer_id, name, email: vEmail, emergency_contact });
       }
       setSuccess("Login successful!");
       speak("Login successful");
-      setTimeout(() => navigate("/volunteer/dashboard", { replace: true }), 400);
+      setTimeout(() => navigate("/volunteer/dashboard", { replace: true }), 200);
     } catch (err) {
-      const msg =
+      // Surface exact server message when possible
+      const serverMsg =
         err?.response?.data?.error ||
         err?.response?.data?.message ||
+        err?.message ||
         "Invalid email or password.";
-      setError(msg);
+
+      // Helpful hint when it's the common “Volunteer not found” path
+      const hint =
+        serverMsg.toLowerCase().includes("not found")
+          ? " (Tip: register first, or check the email spelling.)"
+          : "";
+
+      setError(serverMsg + hint);
       speak("Login failed");
+      // Also log the payload (email only) to help debugging in DevTools
+      // eslint-disable-next-line no-console
+      console.warn("Login failed for:", payload.email, "→", err?.response?.status, serverMsg);
     } finally {
       setLoading(false);
     }
@@ -86,7 +120,7 @@ const VolunteerLogin = ({ onLogin }) => {
     setFpBusy(true);
     setFpMsg("");
     try {
-      await api.volunteerRequestPasswordReset(fpEmail.trim());
+      await api.volunteerRequestPasswordReset((fpEmail || "").trim().toLowerCase());
       setFpMsg(
         "If an account exists for that email, a reset link has been sent. Please check your inbox."
       );
@@ -213,7 +247,7 @@ const VolunteerLogin = ({ onLogin }) => {
         </button>
       </form>
 
-      {/* Forgot password & Reset link row (matches AdminLogin style) */}
+      {/* Forgot password & Reset link row */}
       <div
         style={{
           marginTop: 12,
@@ -309,7 +343,7 @@ const VolunteerLogin = ({ onLogin }) => {
         </section>
       )}
 
-      {/* CTA cards (mirror AdminLogin layout) */}
+      {/* CTA cards */}
       <section className="auth-cta" role="navigation" aria-label="Other options">
         <div className="auth-card" aria-labelledby="new-vol-title">
           <div className="auth-card-header">
@@ -346,7 +380,6 @@ const VolunteerLogin = ({ onLogin }) => {
         </div>
       </section>
 
-      {/* Small focus/spacing tweaks for mobile */}
       <style>{`
         input:focus-visible, button:focus-visible {
           outline: 3px solid #93c5fd80;

@@ -5,14 +5,14 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, date, timedelta
-from sqlalchemy import Enum, Numeric
+from sqlalchemy import Enum, Numeric, func
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal, InvalidOperation
 import os
 import uuid
 import atexit
 import mimetypes  # for accurate Content-Type on previews
-import json
+import json 
 import secrets
 import smtplib
 from email.message import EmailMessage
@@ -97,7 +97,7 @@ def serve_upload(filename):
 # Database configuration
 # --------------------------
 # Use 127.0.0.1 and a short connect timeout so startup fails fast if DB is unreachable
-app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://root:Shanti%40%241003@127.0.0.1:3306/radio1rph"
+app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://root:Veerabhadra%401.@127.0.0.1:3306/radio1rph"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
@@ -150,7 +150,7 @@ class VolPasswordResetToken(db.Model):
     token = db.Column(db.String(128), unique=True, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     used_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)  # fixed typo
 
 class Training(db.Model):
     __tablename__ = 'trainings'
@@ -228,7 +228,8 @@ class TrainingResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     volunteer_id = db.Column(db.Integer, db.ForeignKey('volunteers.id'), nullable=False)
     training_id = db.Column(db.Integer, db.ForeignKey('trainings.id'), nullable=False)
-    result = db.Column(Enum('competent','not_yet_competent','not_assessed','participated'), nullable=False)
+    # >>> UPDATED: include 'did_not_attend'
+    result = db.Column(Enum('competent','not_yet_competent','not_assessed','participated','did_not_attend'), nullable=False)
     issued_by = db.Column(Enum('inhouse','external'), nullable=False, default='inhouse')
     assessor_name = db.Column(db.String(120))
     date_assessed = db.Column(db.Date, default=date.today)
@@ -341,6 +342,7 @@ def qualification_to_dict(q):
 def attendance_to_dict(a):
     return {
         "id": a.id,
+        "volunteer_id": a.id if hasattr(a, "volunteer_id") else None,
         "volunteer_id": a.volunteer_id,
         "clock_in": format_date(a.clock_in),
         "clock_out": format_date(a.clock_out)
@@ -389,7 +391,7 @@ def create_notification_if_absent(audience, volunteer_id, ntype, title, body, me
     else:
         q = q.filter(Notification.volunteer_id == volunteer_id)
 
-    key_fields = ("qualification_id", "result_id")
+    key_fields = ("qualification_id", "result_id", "training_id")
     candidates = q.all()
     for cand in candidates:
         try:
@@ -486,10 +488,100 @@ def run_expiry_scan():
     except Exception as e:
         print("[scheduler] expiry scan error:", e)
 
+# -------- NEW: Training reminder scan (T-7 and T-1) --------
+def run_training_reminders():
+    """
+    Sends reminders for upcoming trainings to:
+      • Approved volunteers (per-training)
+      • Admins/trainers (single roll-up per training)
+
+    Triggers at T-7 and T-1 (days before start_date).
+    """
+    try:
+        today = date.today()
+        targets = {7, 1}
+        trainings = Training.query.filter(Training.start_date.isnot(None)).all()
+
+        for t in trainings:
+            if not t.start_date:
+                continue
+            days = (t.start_date - today).days
+            if days not in targets:
+                continue
+
+            # --- Common details
+            when_str = t.start_date.strftime("%A, %d %B %Y")
+            venue = t.venue or "Venue TBC"
+            title = t.title or f"Training #{t.id}"
+
+            # --- 1) Volunteers with approved EOIs
+            approved_eois = (
+                EOI.query
+                .filter_by(training_id=t.id, status="approved")
+                .all()
+            )
+            for e in approved_eois:
+                vol = Volunteer.query.get(e.volunteer_id)
+                if not vol:
+                    continue
+                vname = vol.name or "Volunteer"
+                ntype = f"training_reminder_t{days}_vol"
+                ntitle = f"Reminder: {title} on {when_str}"
+                nbody = (
+                    f"Hi {vname},\n\n"
+                    f"This is a reminder that your training '{title}' is scheduled for {when_str}.\n"
+                    f"Venue: {venue}\n"
+                )
+                if t.prerequisites:
+                    nbody += f"\nNotes/requirements: {t.prerequisites}\n"
+                create_notification_if_absent(
+                    "volunteer",
+                    vol.id,
+                    ntype,
+                    ntitle,
+                    nbody,
+                    {"training_id": t.id, "days": days}
+                )
+                if vol.email:
+                    _try_send_email(vol.email, ntitle, nbody)
+
+            # --- 2) Admins / Trainer roll-up (send once per training)
+            ntype_admin = f"training_reminder_t{days}_admin"
+            atitle = f"Trainer/Admin reminder: '{title}' on {when_str}"
+            abody = (
+                f"This is a reminder for the upcoming training.\n\n"
+                f"Title: {title}\n"
+                f"Date: {when_str}\n"
+                f"Venue: {venue}\n"
+                f"Trainer: {t.trainer_name or '—'}\n\n"
+                f"Approved volunteers: {len(approved_eois)}\n"
+            )
+            create_notification_if_absent(
+                "admin",
+                None,
+                ntype_admin,
+                atitle,
+                abody,
+                {"training_id": t.id, "days": days}
+            )
+
+            # Email all admins (or the trainer if you later store an email)
+            admins = Admin.query.all()
+            for a in admins:
+                if a.email:
+                    _try_send_email(a.email, atitle, abody)
+
+        print("[scheduler] training reminders scan completed.")
+    except Exception as e:
+        print("[scheduler] training reminders error:", e)
+
 def init_scheduler(app):
     scheduler = BackgroundScheduler(timezone="UTC")
+    # kick once after boot so you can see it working in dev logs
     scheduler.add_job(func=run_expiry_scan, trigger="date", next_run_time=datetime.utcnow() + timedelta(seconds=5))
     scheduler.add_job(func=run_expiry_scan, trigger="cron", hour=0, minute=10)
+    # NEW: run training reminders daily at 00:15 UTC
+    scheduler.add_job(func=run_training_reminders, trigger="cron", hour=0, minute=15)
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown(wait=False))
 
@@ -576,19 +668,19 @@ def volunteer_or_admin_guard(volunteer_id_expected: int | None):
 @jwt.unauthorized_loader
 def _missing_token(err):
     if AUTH_DISABLED:
-        return jsonify({"note": "AUTH_DISABLED: bypassing token"}), 200
+        return jsonify({"identity": {"admin_id": 0, "email": "dev@local"}, "role": "admin"})
     return jsonify({"error": "Missing or invalid Authorization header"}), 401
 
 @jwt.invalid_token_loader
 def _bad_token(err):
     if AUTH_DISABLED:
-        return jsonify({"note": "AUTH_DISABLED: bypassing token"}), 200
+        return jsonify({"identity": {"admin_id": 0, "email": "dev@local"}, "role": "admin"})
     return jsonify({"error": "Invalid token"}), 401
 
 @jwt.expired_token_loader
 def _expired_token(jwt_header, jwt_payload):
     if AUTH_DISABLED:
-        return jsonify({"note": "AUTH_DISABLED: bypassing token"}), 200
+        return jsonify({"identity": {"admin_id": 0, "email": "dev@local"}, "role": "admin"})
     return jsonify({"error": "Token expired"}), 401
 
 # --------------------------
@@ -777,7 +869,6 @@ def volunteer_forgot_password():
         db.session.commit()
         _send_vol_reset_email(vol.email, token)
 
-    # Same response whether the email exists or not (avoid enumeration)
     return jsonify({"ok": True, "message": "If an account exists, we’ve sent a reset link."})
 
 @app.route("/volunteer/reset-password", methods=["POST", "OPTIONS"])
@@ -835,30 +926,46 @@ def _validate_phone_unique_or_400(phone: str, current_id: int | None = None):
         abort(jsonify({"error": "Phone number already in use"}), 400)
 
 @app.route("/volunteer/register", methods=["POST"])
+@app.route("/volunteer/register/", methods=["POST"])
+@app.route("/api/volunteer/register", methods=["POST"])
+@app.route("/api/volunteer/register/", methods=["POST"])
 def register_volunteer():
-    data = request.get_json(silent=True) or {}
-    if "email" not in data or "password" not in data or "name" not in data:
-        return jsonify({"error": "Missing required fields"}), 400
-    email = (data.get("email") or "").strip().lower()
-    if Volunteer.query.filter_by(email=email).first():
-        return jsonify({"error": "Email already registered"}), 400
-    phone = _as_str(data.get("phone"))
-    _validate_phone_unique_or_400(phone)
-    hashed_password = generate_password_hash(data["password"])
-    new_volunteer = Volunteer(
-        name=_as_str(data.get("name")) or "",
-        email=email,
-        phone=phone,
-        emergency_contact=_as_str(data.get("emergency_contact")),
-        status="active",
-        training_goals=_as_str(data.get("training_goals")),
-        password_hash=hashed_password
+    data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
+    raw_email = (data.get("email") or "").strip()
+    email = raw_email.lower()                       # <-- normalize
+    phone = (data.get("phone") or "").strip()
+    password = data.get("password") or ""
+
+    if not name or not email or not password:
+        return jsonify({"error": "Name, email and password are required"}), 400
+
+    # check existing (case-insensitive)
+    exists = Volunteer.query.filter(func.lower(Volunteer.email) == email).first()
+    if exists:
+        return jsonify({"error": "An account already exists for that email"}), 400
+
+    vol = Volunteer(
+        name=name,
+        email=email,                                # <-- stored lower-cased
+        phone=phone or None,
+        password_hash=generate_password_hash(password),
     )
-    db.session.add(new_volunteer)
+    db.session.add(vol)
     db.session.commit()
-    return jsonify({"message": "Volunteer registered successfully", "volunteer_id": new_volunteer.id}), 201
+
+    return jsonify({
+        "ok": True,
+        "volunteer_id": vol.id,
+        "name": vol.name,
+        "email": vol.email,
+    }), 201
+
 
 @app.route("/volunteer/login", methods=["POST"])
+@app.route("/volunteer/login/", methods=["POST"])
+@app.route("/api/volunteer/login", methods=["POST"])
+@app.route("/api/volunteer/login/", methods=["POST"])
 def login_volunteer():
     data = request.get_json()
     if not data or "email" not in data or "password" not in data:
@@ -910,7 +1017,6 @@ def admin_add_volunteer():
     db.session.commit()
     return jsonify({"message": "Volunteer created", "volunteer": volunteer_to_dict(v)}), 201
 
-# Replace this whole route in app.py
 @app.put("/volunteers/<int:vid>")
 def update_volunteer_self_or_admin(vid):
     # Allow: admins OR the volunteer whose id == vid
@@ -991,6 +1097,28 @@ def admin_delete_volunteer(vid):
 def get_trainings():
     trainings = Training.query.order_by(Training.start_date.asc()).all()
     return jsonify([training_to_dict(t) for t in trainings])
+# ===== PUBLIC TRAININGS FIX =====
+@app.route("/trainings/public", methods=["GET", "OPTIONS"])
+def get_trainings_public():
+    if request.method == "OPTIONS":
+        return ("", 204)
+    try:
+        trainings = Training.query.order_by(Training.start_date.asc()).all()
+        data = []
+        for t in trainings:
+            data.append({
+                "id": t.id,
+                "title": t.title,
+                "start_date": getattr(t, "start_date", None),
+                "end_date": getattr(t, "end_date", None),
+                "venue": getattr(t, "venue", None),
+                "provider": getattr(t, "provider", None),
+                "capacity": getattr(t, "capacity", None)
+            })
+        return jsonify(data), 200
+    except Exception as e:
+        print("Error in /trainings/public:", e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/trainings/<int:id>", methods=["GET"])
 def get_training(id):
@@ -1025,6 +1153,7 @@ def add_training():
     db.session.add(new_t)
     db.session.commit()
     return jsonify({"message": "Training added successfully", "id": new_t.id}), 201
+
 
 @app.route("/trainings/<int:id>", methods=["PUT"])
 def update_training(id):
@@ -1210,8 +1339,6 @@ def export_attendance_csv():
     start = datetime.combine(day, datetime.min.time())
     end   = start + timedelta(days=1)
 
-    # Include any session that overlaps [start, end)
-    # i.e. clock_in < end AND (clock_out IS NULL OR clock_out >= start)
     rows = (
         db.session.query(Attendance, Volunteer)
         .join(Volunteer, Attendance.volunteer_id == Volunteer.id)
@@ -1268,10 +1395,12 @@ def get_volunteer_eois_alias(volunteer_id):
     return jsonify([eoi_to_dict(e) for e in eois])
 
 # --------------------------
-# Notifications (volunteer)
+# Notifications (volunteer + admin)  **CLEAN SINGLE DEFINITIONS**
 # --------------------------
-@app.get("/volunteers/<int:volunteer_id>/notifications")
+@app.route("/volunteers/<int:volunteer_id>/notifications", methods=["GET", "OPTIONS"])
 def get_volunteer_notifications(volunteer_id):
+    if request.method == "OPTIONS":
+        return ("", 204)
     items = (Notification.query
              .filter(Notification.audience == "volunteer",
                      Notification.volunteer_id == volunteer_id)
@@ -1279,8 +1408,31 @@ def get_volunteer_notifications(volunteer_id):
              .all())
     return jsonify([n.serialize() for n in items])
 
-@app.post("/notifications/<int:nid>/read")
+@app.route("/admin/notifications", methods=["GET", "OPTIONS"])
+def get_admin_notifications():
+    if request.method == "OPTIONS":
+        return ("", 204)
+    # Allow bypass if auth disabled (DEV mode)
+    if AUTH_DISABLED:
+        items = (Notification.query
+                 .filter(Notification.audience == "admin")
+                 .order_by(Notification.created_at.desc())
+                 .all())
+        return jsonify([n.serialize() for n in items])
+    guard = admin_guard()
+    if guard:
+        return guard
+    items = (Notification.query
+             .filter(Notification.audience == "admin")
+             .order_by(Notification.created_at.desc())
+             .all())
+    return jsonify([n.serialize() for n in items])
+
+
+@app.route("/notifications/<int:nid>/read", methods=["POST", "OPTIONS"])
 def mark_notification_read(nid):
+    if request.method == "OPTIONS":
+        return ("", 204)
     n = Notification.query.get_or_404(nid)
     n.read_at = datetime.utcnow()
     db.session.commit()
@@ -1327,6 +1479,52 @@ def reminders_run_alias():
         return jsonify({"ok": True, "note": "Expiry reminder scan executed."})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+# --- Training Start Reminder Scan (1 week before start) ---
+@app.route("/trainings/reminders/run", methods=["POST", "OPTIONS"])
+def trainings_reminders_run():
+    if request.method == "OPTIONS":
+        return ("", 204)
+    try:
+        today = date.today()
+        upcoming_start = today + timedelta(days=7)
+
+        # Fetch trainings that start within the next 7 days
+        upcoming_trainings = Training.query.filter(
+            Training.start_date >= today,
+            Training.start_date <= upcoming_start
+        ).all()
+
+        created = 0
+        for t in upcoming_trainings:
+            title = f"Upcoming Training: {t.title}"
+            body = f"Training '{t.title}' starts on {t.start_date.strftime('%d %b %Y')} at {t.venue or 'TBD'}."
+            
+            # Check if reminder already exists
+            exists = Notification.query.filter_by(
+                audience="admin",
+                type="training_start",
+                title=title
+            ).first()
+            if not exists:
+                n = Notification(
+                    audience="admin",
+                    volunteer_id=None,
+                    title=title,
+                    body=body,
+                    type="training_start",
+                    meta={"training_id": t.id, "start_date": str(t.start_date)},
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(n)
+                created += 1
+
+        db.session.commit()
+        print(f"[Reminders] Created {created} new training-start reminders.")
+        return jsonify({"message": f"Created {created} reminders", "count": created}), 200
+    except Exception as e:
+        print("Error in /trainings/reminders/run:", e)
+        return jsonify({"error": str(e)}), 500
 
 # --------------------------
 # EOIs
@@ -1517,7 +1715,14 @@ def _notify_training_result(r: TrainingResult):
         else:
             body = f"{vname}, your result for {ttitle} is Not Yet Competent. We’ll advise the next opportunity soon."
         ntype = "training_result_nyc"
-    else:
+    elif r.result == "did_not_attend":
+        title = f"Result recorded: Did Not Attend — {ttitle}"
+        body = (
+            f"Hi {vname}, our records show you did not attend {ttitle}. "
+            "If this is unexpected, please contact the training coordinator."
+        )
+        ntype = "training_result_did_not_attend"
+    else:  # not_assessed
         title = f"Result recorded: Not Assessed — {ttitle}"
         body = f"{vname}, your result for {ttitle} is Not Assessed at this time."
         ntype = "training_result_not_assessed"
@@ -1571,7 +1776,8 @@ def create_training_result():
         certificate_path = data.get("certificate_path")
         evidence_path = data.get("evidence_path")
 
-    if not volunteer_id or not training_id or result not in ("competent","not_yet_competent","not_assessed","participated"):
+    # >>> UPDATED: allow 'did_not_attend'
+    if not volunteer_id or not training_id or result not in ("competent","not_yet_competent","not_assessed","participated","did_not_attend"):
         return jsonify({"error": "volunteer_id, training_id and valid result are required"}), 400
     if issued_by not in ("inhouse","external"):
         return jsonify({"error": "issued_by must be 'inhouse' or 'external'"}), 400
@@ -1606,7 +1812,7 @@ def update_training_result(result_id):
         form = request.form
         if "result" in form:
             val = (form.get("result") or "").strip().lower()
-            if val in ("competent","not_yet_competent","not_assessed","participated"):
+            if val in ("competent","not_yet_competent","not_assessed","participated","did_not_attend"):
                 r.result = val
         if "issued_by" in form:
             val = (form.get("issued_by") or "").strip().lower()
@@ -1634,7 +1840,7 @@ def update_training_result(result_id):
     else:
         data = request.get_json() or {}
         val = (str(data.get("result") or "")).strip().lower()
-        if val in ("competent","not_yet_competent","not_assessed","participated"):
+        if val in ("competent","not_yet_competent","not_assessed","participated","did_not_attend"):
             r.result = val
         val = (str(data.get("issued_by") or "")).strip().lower()
         if val in ("inhouse","external"):
@@ -1702,6 +1908,23 @@ def list_volunteer_results(volunteer_id):
     rows = TrainingResult.query.filter_by(volunteer_id=volunteer_id).order_by(TrainingResult.created_at.desc()).all()
     return jsonify([_result_to_dict(r) for r in rows])
 
+
+
+@app.get("/__ping")
+def __ping():
+    return jsonify({"ok": True, "auth_disabled": AUTH_DISABLED})
+
+@app.get("/__routes")
+def __routes():
+    # list all registered routes + methods so we can confirm /volunteer/login exists
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            "rule": str(rule),
+            "methods": sorted(m for m in rule.methods if m not in ("HEAD", "OPTIONS"))
+        })
+    return jsonify(sorted(routes, key=lambda r: r["rule"]))
+
 # --------------------------
 # Run App
 # --------------------------
@@ -1715,6 +1938,6 @@ if __name__ == "__main__":
             print("[startup] URI:", app.config['SQLALCHEMY_DATABASE_URI'])
             raise
         db.create_all()
-        # init_scheduler(app)  # keep off while troubleshooting
-    # Disable reloader on Windows to avoid double-start/port conflicts
+        # init_scheduler(app)  # ← uncomment to enable daily scans (expiry + training reminders)
+    # Disable reloader duplication issues
     app.run(debug=True, use_reloader=False, port=5000)

@@ -7,7 +7,11 @@ const Navbar = ({ onLogout }) => {
   const location = useLocation();
 
   // Only show this navbar for admins
-  const isAdmin = location.pathname.startsWith("/admin") || location.pathname.startsWith("/volunteers") || location.pathname.startsWith("/trainings") || location.pathname.startsWith("/qualifications");
+  const isAdmin =
+    location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/volunteers") ||
+    location.pathname.startsWith("/trainings") ||
+    location.pathname.startsWith("/qualifications");
   if (!isAdmin) return null;
 
   return (
@@ -33,6 +37,7 @@ const Navbar = ({ onLogout }) => {
         <button
           aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={menuOpen}
+          aria-controls="admin-nav-links"
           onClick={() => setMenuOpen(!menuOpen)}
           className="hamburger"
         >
@@ -41,15 +46,15 @@ const Navbar = ({ onLogout }) => {
       </div>
 
       {/* Admin Navigation links */}
-      <ul className={`nav-links ${menuOpen ? "open" : ""}`}>
+      <ul id="admin-nav-links" className={`nav-links ${menuOpen ? "open" : ""}`}>
         <li>
           <Link to="/volunteers" style={linkStyle}>
             Volunteers
           </Link>
         </li>
         <li>
-          <Link to="/trainings" style={linkStyle}>
-            Trainings
+          <Link to="/trainings" style={linkStyle} aria-label="Training">
+            Training
           </Link>
         </li>
         <li>
@@ -60,6 +65,12 @@ const Navbar = ({ onLogout }) => {
         <li>
           <Link to="/admin/eois" style={linkStyle}>
             EOIs
+          </Link>
+        </li>
+        {/* NEW: Reminders link so you can access /admin/reminders */}
+        <li>
+          <Link to="/admin/reminders" style={linkStyle} aria-label="Reminders">
+            Reminders
           </Link>
         </li>
         <li>

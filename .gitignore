@@ -1,18 +1,17 @@
-# Node (React) 
-node_modules/ 
-build/ 
-dist/ 
-# Python (Flask) 
-__pycache__/ 
-*.pyc 
-*.pyo 
-*.pyd 
-*.db 
-instance/ 
-.venv/ 
-venv/ 
-.env 
-# Logs 
-*.log 
-# System 
-.DS_Store 
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Node
+node_modules/
+build/
+dist/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

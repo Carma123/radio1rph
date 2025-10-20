@@ -1,3 +1,4 @@
+
 // src/components/QualificationsList.js
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -10,8 +11,10 @@ const isPdfExt = (p) => ext(p) === "pdf";
 
 /** API base + auth helpers for protected downloads */
 const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
-const absoluteUrl = (path) => (/^https?:\/\//i.test(path) ? path : `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`);
-const getActiveAccessToken = () => localStorage.getItem("access_token") || localStorage.getItem("vol_access_token");
+const absoluteUrl = (path) =>
+  (/^https?:\/\//i.test(path) ? path : `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`);
+const getActiveAccessToken = () =>
+  localStorage.getItem("access_token") || localStorage.getItem("vol_access_token");
 
 /** Helpers to resolve volunteer id robustly */
 const safeParseVolunteer = () => {
@@ -74,14 +77,18 @@ const QualificationsList = () => {
       setLoading(true);
       setMessage("");
       try {
+        // NOTE: api.getQualificationsByVolunteer() does not exist in your api.js.
+        // We fetch all and filter client-side by volunteerId.
         const [volRes, qualRes, trnRes] = await Promise.all([
           api.getVolunteerById(volunteerId),
-          api.getQualificationsByVolunteer(volunteerId),
+          api.getQualifications(),
           api.getTrainings(),
         ]);
 
         setVolunteer(volRes.data);
-        setQualifications(Array.isArray(qualRes.data) ? qualRes.data : []);
+
+        const allQuals = Array.isArray(qualRes.data) ? qualRes.data : [];
+        setQualifications(allQuals.filter((q) => Number(q.volunteer_id) === Number(volunteerId)));
 
         const map = {};
         (trnRes.data || []).forEach((t) => (map[t.id] = t.title));
@@ -101,22 +108,39 @@ const QualificationsList = () => {
     if (!volunteerId) return;
     api
       .getQualificationReminders(volunteerId)
-      .then((res) => setReminders(Array.isArray(res.data) ? res.data : []))
+      .then((res) => {
+        const items = Array.isArray(res.data) ? res.data : [];
+        // Support both shapes:
+        // 1) /qualifications/reminders/:id → { message }
+        // 2) /volunteers/:id/notifications → { title, body }
+        const normalized = items.map((n) => {
+          if (n.message) return n;
+          const message = n.title ? (n.body ? `${n.title} — ${n.body}` : n.title) : "Notification";
+          return { ...n, message };
+        });
+        setReminders(normalized);
+      })
       .catch((err) => {
         console.error("Failed to load reminders", err);
         setReminders([]);
       });
   }, [volunteerId]);
 
-  // Optional: manual run of reminder job (handy for acceptance testing)
+  // Manual run of reminder job (dev/test)
   const handleRunReminderCheck = async () => {
     setRemBusy(true);
     setRemNote("");
     try {
-      const res = await api.runReminderCheck();
+      const res = await api.runQualificationReminderScan();
       setRemNote(res?.data?.note || "Reminder check executed.");
       const r = await api.getQualificationReminders(volunteerId);
-      setReminders(Array.isArray(r.data) ? r.data : []);
+      const items = Array.isArray(r.data) ? r.data : [];
+      const normalized = items.map((n) => {
+        if (n.message) return n;
+        const message = n.title ? (n.body ? `${n.title} — ${n.body}` : n.title) : "Notification";
+        return { ...n, message };
+      });
+      setReminders(normalized);
     } catch (err) {
       console.error("Reminder check failed", err);
       setRemNote("Failed to run reminder check.");
@@ -571,3 +595,4 @@ const InlineStyles = () => (
 );
 
 export default QualificationsList;
+
