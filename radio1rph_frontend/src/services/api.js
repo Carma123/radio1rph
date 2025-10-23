@@ -1,13 +1,21 @@
 // src/services/api.js
 import axios from "axios";
 
-const BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
+/* ---------------------------------
+   Base URL (prefer localhost:5000 in dev)
+---------------------------------- */
+const inferDevBase = () => {
+  const h = (typeof window !== "undefined" && window.location && window.location.hostname) || "localhost";
+  return (h === "localhost" || h === "127.0.0.1") ? "http://localhost:5000" : "http://127.0.0.1:5000";
+};
+export const BASE_URL = process.env.REACT_APP_API_URL || inferDevBase();
 
 /* ---------------------------------
    Storage keys
 ---------------------------------- */
 const ADMIN_ACCESS = "access_token";
 const ADMIN_REFRESH = "refresh_token";
+<<<<<<< Updated upstream
 
 // Current keys used across the app
 const VOL_ACCESS = "vol_access";
@@ -19,6 +27,12 @@ const VOL_REFRESH_LEGACY = "vol_refresh_token";
 
 const ADMIN_KEY = "admin";
 const VOLUNTEER_KEY = "volunteer";
+=======
+const VOL_ACCESS   = "vol_access_token";
+const VOL_REFRESH  = "vol_refresh_token";
+const ADMIN_KEY    = "admin";
+const VOLUNTEER_KEY= "volunteer";
+>>>>>>> Stashed changes
 
 /* ---------------------------------
    Helpers
@@ -89,13 +103,18 @@ const pickActiveRole = () => {
 };
 
 /* ---------------------------------
+<<<<<<< Updated upstream
    Axios Instances
+=======
+   Axios (no cookies; we use Authorization header)
+>>>>>>> Stashed changes
 ---------------------------------- */
-const API = axios.create({
+const COMMON_CFG = {
   baseURL: BASE_URL,
-  withCredentials: false,
+  withCredentials: false,              // IMPORTANT: backend has supports_credentials=False
   timeout: 15000,
   headers: { Accept: "application/json" },
+<<<<<<< Updated upstream
 });
 const PUB = axios.create({
   baseURL: BASE_URL,
@@ -106,42 +125,87 @@ const PUB = axios.create({
 
 /* ---------------------------------
    Request Interceptor (role-aware)
+=======
+};
+
+const API = axios.create(COMMON_CFG);
+const PUB = axios.create(COMMON_CFG);
+
+/* Ensure JSON headers on mutating requests unless FormData */
+const ensureJsonHeaders = (config) => {
+  const method = (config.method || "get").toLowerCase();
+  const isMutate = ["post", "put", "patch", "delete"].includes(method);
+  const isFormData = typeof FormData !== "undefined" && config.data instanceof FormData;
+  if (isMutate && !isFormData) {
+    config.headers = config.headers || {};
+    if (!config.headers["Content-Type"]) {
+      config.headers["Content-Type"] = "application/json";
+    }
+  }
+  return config;
+};
+API.interceptors.request.use(ensureJsonHeaders);
+PUB.interceptors.request.use(ensureJsonHeaders);
+
+/* ---------------------------------
+   Request interceptor (roles/tokens)
+>>>>>>> Stashed changes
 ---------------------------------- */
 API.interceptors.request.use((config) => {
   const url = (config.url || "").toLowerCase();
   const method = (config.method || "get").toLowerCase();
 
+<<<<<<< Updated upstream
   // self-edit detection when PUT /volunteers/:id
   const matchVolunteerId = url.match(/^\/volunteers\/(\d+)(?:\/|$)/);
   const targetVolunteerId = matchVolunteerId ? Number(matchVolunteerId[1]) : null;
+=======
+  const matchVolunteerId = url.match(/^\/volunteers\/(\d+)(?:\/|$)/);
+  const targetVolunteerId = matchVolunteerId ? Number(matchVolunteerId[1]) : null;
+
+>>>>>>> Stashed changes
   const vIdent = getVolunteerIdentity();
   const selfVolunteerId = vIdent ? Number(vIdent.id ?? vIdent.volunteer_id) : null;
 
   let needsAdmin = false;
 
-  // Admin-only areas
   if (
     url.startsWith("/training-results") ||
     /\/trainings\/\d+\/results$/.test(url) ||
     url.startsWith("/eois/pending") ||
     (url.startsWith("/eois/") && ["put", "delete"].includes(method)) ||
     (url.startsWith("/trainings") && ["post", "put", "delete"].includes(method)) ||
+<<<<<<< Updated upstream
     (url.startsWith("/qualifications") && method === "delete") ||
     url.startsWith("/admin/notifications")
+=======
+    (url.startsWith("/qualifications") && method === "delete")
+>>>>>>> Stashed changes
   ) {
     needsAdmin = true;
   }
 
+<<<<<<< Updated upstream
   // Volunteers CRUD: POST/DELETE admin; self PUT allowed
+=======
+>>>>>>> Stashed changes
   if (url.startsWith("/volunteers")) {
     if (method === "post" || method === "delete") {
       needsAdmin = true;
     } else if (method === "put") {
+<<<<<<< Updated upstream
       needsAdmin = !(
         targetVolunteerId &&
         selfVolunteerId &&
         targetVolunteerId === selfVolunteerId
       );
+=======
+      if (targetVolunteerId && selfVolunteerId && targetVolunteerId === selfVolunteerId) {
+        needsAdmin = false;
+      } else {
+        needsAdmin = true;
+      }
+>>>>>>> Stashed changes
     }
   }
 
@@ -155,8 +219,17 @@ API.interceptors.request.use((config) => {
       ? tokens.getVol().access
       : null;
 
+<<<<<<< Updated upstream
   if (token) config.headers.Authorization = `Bearer ${token}`;
   else delete config.headers.Authorization;
+=======
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  } else if (config.headers) {
+    delete config.headers.Authorization;
+  }
+>>>>>>> Stashed changes
 
   config.__role = role;
   return config;
@@ -180,7 +253,10 @@ const refreshForRole = async (role) => {
   if (!refresh) throw new Error("No refresh token");
 
   try {
+<<<<<<< Updated upstream
     // Primary: Authorization Bearer refresh -> /auth/refresh
+=======
+>>>>>>> Stashed changes
     const r = await axios.post(`${BASE_URL}/auth/refresh`, null, {
       headers: { Authorization: `Bearer ${refresh}` },
     });
@@ -190,10 +266,18 @@ const refreshForRole = async (role) => {
     else tokens.setVol(access, refresh);
     return access;
   } catch {
+<<<<<<< Updated upstream
     // Fallback: JSON body -> /auth/refresh/json
     const r2 = await axios.post(`${BASE_URL}/auth/refresh/json`, {
       refresh_token: refresh,
     });
+=======
+    const r2 = await axios.post(
+      `${BASE_URL}/auth/refresh/json`,
+      { refresh_token: refresh },
+      { withCredentials: false }
+    );
+>>>>>>> Stashed changes
     const access = r2.data?.access_token;
     if (!access) throw new Error("No access token (refresh/json)");
     if (role === "admin") tokens.setAdmin(access, refresh);
@@ -206,8 +290,19 @@ API.interceptors.response.use(
   (res) => res,
   async (error) => {
     const { config, response } = error || {};
+<<<<<<< Updated upstream
     if (!response) return Promise.reject(error);
     const isRefreshCall = config?.url?.includes("/auth/refresh");
+=======
+    if (!response) {
+      error.message = "Network error (possible CORS or server down)";
+      return Promise.reject(error);
+    }
+
+    const isRefreshCall =
+      config?.url?.includes("/auth/refresh") ||
+      config?.url?.includes("/auth/refresh/json");
+>>>>>>> Stashed changes
     if (isRefreshCall) return Promise.reject(error);
     if (response.status !== 401 || config._retry) return Promise.reject(error);
 
@@ -244,7 +339,25 @@ API.interceptors.response.use(
 );
 
 /* ---------------------------------
+<<<<<<< Updated upstream
    Auth Facade
+=======
+   Back-compat token helpers (AdminLogin.js)
+---------------------------------- */
+export const getAccessToken = () => localStorage.getItem(ADMIN_ACCESS);
+export const getRefreshToken = () => localStorage.getItem(ADMIN_REFRESH);
+export const setTokens = (access, refresh) => {
+  tokens.setAdmin(access, refresh);
+  if (access) API.defaults.headers.common.Authorization = `Bearer ${access}`;
+};
+export const clearTokens = () => {
+  tokens.clearAll();
+  delete API.defaults.headers.common.Authorization;
+};
+
+/* ---------------------------------
+   Public auth facade
+>>>>>>> Stashed changes
 ---------------------------------- */
 const auth = {
   setFromStorage() {
@@ -276,6 +389,7 @@ export const touchAdminAuth = () => auth.setFromStorage();
 export const getVolunteers = () => PUB.get("/volunteers");
 export const getVolunteerById = (id) => PUB.get(`/volunteers/${id}`);
 
+<<<<<<< Updated upstream
 // Update own volunteer profile (self-service)
 // Try PUT first; fall back to PATCH if backend uses that.
 export const updateVolunteer = async (id, data) => {
@@ -291,6 +405,16 @@ export const updateVolunteer = async (id, data) => {
     }
     throw err;
   }
+=======
+export const loginVolunteerAndStore = async (data) => {
+  const res = await PUB.post("/volunteer/login", data, {
+    headers: { "Content-Type": "application/json" },
+  });
+  const { access_token, refresh_token, volunteer_id, name, email, emergency_contact } = res.data || {};
+  if (volunteer_id) setVolunteerIdentity({ id: volunteer_id, volunteer_id, name, email, emergency_contact });
+  if (access_token && refresh_token) tokens.setVol(access_token, refresh_token);
+  return res;
+>>>>>>> Stashed changes
 };
 
 export const registerVolunteer = (data) =>
@@ -300,6 +424,7 @@ export const registerVolunteer = (data) =>
   });
 
 /* =========================
+<<<<<<< Updated upstream
    Admin & Volunteer Auth
 ========================= */
 export const loginVolunteerAndStore = async (data) => {
@@ -344,6 +469,39 @@ export const registerAdmin = (data) =>
 export const volunteerRequestPasswordReset = (email) =>
   PUB.post("/volunteer/request-password-reset", {
     email: (email || "").trim().toLowerCase(),
+=======
+   ADMIN AUTH
+   ========================= */
+export const registerAdmin = (data) =>
+  PUB.post("/admin/register", data, { headers: { "Content-Type": "application/json" } });
+
+export const loginAdminAndStore = (data) =>
+  PUB.post("/admin/login", data, { headers: { "Content-Type": "application/json" } })
+    .then((res) => {
+      const { access_token, refresh_token, admin_id, role, access, refresh, id } = res.data || {};
+      const aTok = access_token || access;
+      const rTok = refresh_token || refresh;
+      const aId  = admin_id || id;
+      if (aId) setAdminIdentity({ admin_id: aId, role: role || "admin" });
+      if (aTok && rTok) setTokens(aTok, rTok);
+      return res;
+    });
+
+export const loginAdmin = loginAdminAndStore;
+export const authMe = () => API.get("/auth/me");
+
+/* ---------- Forgot / Reset password (ADMIN) ---------- */
+export const requestAdminPasswordReset = (payload) =>
+  axios.post(`${BASE_URL}/admin/forgot-password`, payload, {
+    withCredentials: false,
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+  });
+
+export const resetAdminPassword = (payload) =>
+  axios.post(`${BASE_URL}/admin/reset-password`, payload, {
+    withCredentials: false,
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+>>>>>>> Stashed changes
   });
 
 /* =========================
@@ -409,6 +567,7 @@ const fmtCsvDate = (day) => {
   return String(day).slice(0, 10); // assume YYYY-MM-DD
 };
 
+<<<<<<< Updated upstream
 export const getAttendanceCsvUrl = (day) =>
   `${BASE_URL}/attendance/export?date=${encodeURIComponent(fmtCsvDate(day))}`;
 
@@ -432,6 +591,97 @@ export const getVolunteerTrainingResults = (volunteerId) =>
 ========================= */
 export const getQualificationReminders = (volunteerId) =>
   PUB.get(`/qualifications/reminders/${volunteerId ?? getActiveVolunteerId()}`);
+=======
+/* =========================
+   QUALIFICATIONS
+   ========================= */
+export const addQualification = (payload) => {
+  if (payload instanceof FormData) {
+    return API.post("/qualifications", payload);
+  }
+  return API.post("/qualifications", {
+    ...payload,
+    issue_date: payload.issue_date ?? null,
+    expiry_date: payload.expiry_date ?? null,
+    document_url: payload.document_url ?? undefined,
+    document_path: payload.document_path ?? undefined,
+  });
+};
+
+export const updateQualification = (id, payload) => {
+  if (payload instanceof FormData) {
+    return API.put(`/qualifications/${id}`, payload);
+  }
+  return API.put(`/qualifications/${id}`, {
+    ...payload,
+    issue_date: payload.issue_date ?? null,
+    expiry_date: payload.expiry_date ?? null,
+    document_url: payload.document_url ?? undefined,
+    document_path: payload.document_path ?? undefined,
+  });
+};
+
+export const getQualifications = () => PUB.get("/qualifications");
+export const getQualificationsByVolunteer = (volunteerId) =>
+  PUB.get(`/volunteers/${volunteerId}/qualifications`);
+export const deleteQualification = (id) => API.delete(`/qualifications/${id}`);
+
+/* ===== VOLUNTEER-SCOPED QUALIFICATION ENDPOINTS ===== */
+export const addVolunteerQualification = (volunteerId, formData) => {
+  return API.request({
+    method: "POST",
+    url: `/volunteers/${volunteerId}/qualifications`,
+    data: formData,
+    headers: formData instanceof FormData ? {} : { "Content-Type": "application/json" },
+    __role: "vol",
+  });
+};
+
+export const addVolunteerQualificationJSON = (volunteerId, payload) => {
+  return API.request({
+    method: "POST",
+    url: `/volunteers/${volunteerId}/qualifications`,
+    data: {
+      ...payload,
+      issue_date: payload.issue_date ?? null,
+      expiry_date: payload.expiry_date ?? null,
+      document_url: payload.document_url ?? undefined,
+    },
+    headers: { "Content-Type": "application/json" },
+    __role: "vol",
+  });
+};
+
+export const updateVolunteerQualification = (qualificationId, payloadOrForm) => {
+  const isForm = payloadOrForm instanceof FormData;
+  return API.request({
+    method: "PUT",
+    url: `/qualifications/${qualificationId}`,
+    data: isForm
+      ? payloadOrForm
+      : {
+          ...payloadOrForm,
+          issue_date: payloadOrForm.issue_date ?? null,
+          expiry_date: payloadOrForm.expiry_date ?? null,
+          document_url: payloadOrForm.document_url ?? undefined,
+          document_path: payloadOrForm.document_path ?? undefined,
+        },
+    headers: isForm ? {} : { "Content-Type": "application/json" },
+    __role: "vol",
+  });
+};
+
+/* ===== Reminders / Notifications ===== */
+export const getQualificationReminders = (volunteerId) =>
+  PUB.get(`/volunteers/${volunteerId}/notifications`);
+export const runReminderCheck = async () => {
+  try {
+    return await PUB.post(`/qualifications/reminders/run`);
+  } catch (e) {
+    try { return await PUB.post(`/jobs/run_reminder_check`); } catch { throw e; }
+  }
+};
+>>>>>>> Stashed changes
 
 export const getVolunteerNotifications = (volunteerId) =>
   PUB.get(`/volunteers/${volunteerId}/notifications`);
@@ -448,19 +698,111 @@ export const runReminderCheck = (volunteerId) =>
   getQualificationReminders(volunteerId ?? getActiveVolunteerId());
 
 /* =========================
+<<<<<<< Updated upstream
    API Export (default)
 ========================= */
 const api = {
+=======
+   TRAINING RESULTS
+   ========================= */
+export const createTrainingResult = (payload) => {
+  if (payload instanceof FormData) {
+    return API.post(`/training-results`, payload);
+  }
+  return API.post(`/training-results`, {
+    volunteer_id: payload.volunteer_id,
+    training_id: payload.training_id,
+    result: payload.result,
+    issued_by: payload.issued_by ?? "inhouse",
+    assessor_name: payload.assessor_name ?? null,
+    date_assessed: payload.date_assessed ?? null,
+    notes: payload.notes ?? null,
+    next_opportunity: payload.next_opportunity ?? null,
+    certificate_path: payload.certificate_path ?? undefined,
+    evidence_path: payload.evidence_path ?? undefined,
+  });
+};
+
+export const updateTrainingResult = (resultId, payload) => {
+  if (payload instanceof FormData) return API.put(`/training-results/${resultId}`, payload);
+  return API.put(`/training-results/${resultId}`, {
+    result: payload.result ?? undefined,
+    issued_by: payload.issued_by ?? undefined,
+    assessor_name: payload.assessor_name ?? undefined,
+    date_assessed: payload.date_assessed ?? undefined,
+    notes: payload.notes ?? undefined,
+    next_opportunity: payload.next_opportunity ?? undefined,
+    certificate_path: payload.certificate_path ?? undefined,
+    evidence_path: payload.evidence_path ?? undefined,
+  });
+};
+
+export const uploadResultCertificate = (resultId, file) => {
+  const fd = new FormData();
+  fd.append("certificate", file);
+  return API.post(`/training-results/${resultId}/certificate`, fd);
+};
+
+export const uploadResultEvidence = (resultId, file) => {
+  const fd = new FormData();
+  fd.append("evidence", file);
+  return API.post(`/training-results/${resultId}/evidence`, fd);
+};
+
+export const getTrainingResults = (trainingId) =>
+  API.get(`/trainings/${trainingId}/results`);
+
+export const getVolunteerTrainingResults = (volunteerId) =>
+  API.get(`/volunteers/${volunteerId}/training-results`);
+
+/* =========================
+   VOLUNTEERS (admin CRUD)
+   ========================= */
+export const addVolunteer = (payload) => API.post("/volunteers", payload);
+export const updateVolunteer = (id, payload) => API.put(`/volunteers/${id}`, payload);
+export const deleteVolunteer = (id) => API.delete(`/volunteers/${id}`);
+
+/* =========================
+   Namespaced default export
+   ========================= */
+const api = {
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+  clearTokens,
+
+>>>>>>> Stashed changes
   auth,
   touchAdminAuth,
 
+<<<<<<< Updated upstream
   // Auth
+=======
+  getVolunteers,
+  getVolunteerById,
+
+  addVolunteer,
+  updateVolunteer,
+  deleteVolunteer,
+
+  registerAdmin,
+  loginAdminAndStore,
+  loginAdmin,
+  authMe,
+
+  requestAdminPasswordReset,
+  resetAdminPassword,
+
+  registerVolunteer,
+  loginVolunteerAndStore,
+>>>>>>> Stashed changes
   loginVolunteer,
   loginVolunteerAndStore,
   loginAdminAndStore,
   volunteerRequestPasswordReset,
   registerAdmin, // <-- added
 
+<<<<<<< Updated upstream
   // Admin reminders
   getAdminNotifications,
   markNotificationRead,
@@ -473,9 +815,28 @@ const api = {
   // Public endpoints
   getPublicTrainings,
   getPublicEOIs,
+=======
+  getTrainings,
+  getPublicTrainings,
+  getTrainingById,
+  getTraining,
+  getTrainingCapacity,
+  addTraining,
+  updateTraining,
+  deleteTraining,
+
+  getAttendance,
+  getAttendanceByVolunteer,
+  clockIn,
+  clockOut,
+  deleteAllAttendance,
+  getAttendanceCsvUrl,
+
+>>>>>>> Stashed changes
   getQualifications,
   getQualificationsByVolunteer,
 
+<<<<<<< Updated upstream
   // Training Results (Admin/Volunteer)
   getTrainingResults,
   createTrainingResult,
@@ -484,8 +845,13 @@ const api = {
 
   // Capacity helper
   getTrainingCapacity,
+=======
+  getQualificationReminders,
+  runReminderCheck,
+  getVolunteerNotifications,
+  markNotificationRead,
+>>>>>>> Stashed changes
 
-  // EOIs
   submitEOI,
   getVolunteerEOIs,
   cancelEOI,
@@ -494,6 +860,7 @@ const api = {
   moveEOIToStandby,
   promoteEOI,
 
+<<<<<<< Updated upstream
   // Trainings
   getTrainings,
   getTrainingById,
@@ -520,6 +887,18 @@ const api = {
   clockOut,
   getAttendanceCsvUrl,
   downloadAttendanceCsv,
+=======
+  createTrainingResult,
+  updateTrainingResult,
+  uploadResultCertificate,
+  uploadResultEvidence,
+  getTrainingResults,
+  getVolunteerTrainingResults,
+
+  addVolunteerQualification,
+  addVolunteerQualificationJSON,
+  updateVolunteerQualification,
+>>>>>>> Stashed changes
 };
 
 export default api;

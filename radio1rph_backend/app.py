@@ -36,20 +36,37 @@ except Exception:
 # --------------------------
 app = Flask(__name__)
 
+@app.after_request
+def _force_cors_headers(resp):
+    # Only set if missing (Flask-CORS usually sets these already)
+    resp.headers.setdefault("Access-Control-Allow-Origin", "*")
+    resp.headers.setdefault("Access-Control-Allow-Headers", "Content-Type, Authorization")
+    resp.headers.setdefault("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+    resp.headers.setdefault("Access-Control-Expose-Headers", "Content-Disposition")
+    return resp
+
+
+
 # ===== Auth kill-switch (defaults to True for DEV) =====
 AUTH_DISABLED = os.environ.get("AUTH_DISABLED", "true").strip().lower() in ("1", "true", "yes", "on")
 
-# CORS (explicit: methods + Authorization header)
+# CORS (explicit allow-list for local dev)
 CORS(
     app,
-    resources={r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "expose_headers": ["Content-Disposition"],
-    }},
-    supports_credentials=False,
+    resources={
+        r"/*": {
+            "origins": [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ],
+            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Content-Disposition"],
+        }
+    },
+    supports_credentials=False,  # keep false unless you need cookies
 )
+
 
 # ==== JWT config (kept for when you re-enable auth) ====
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me")
@@ -1184,14 +1201,37 @@ def update_training(id):
     db.session.commit()
     return jsonify({"message": "Training updated successfully"})
 
-@app.route("/trainings/<int:id>", methods=["DELETE"])
+@app.route("/trainings/<int:id>", methods=["DELETE", "OPTIONS"])
 def delete_training(id):
+    if request.method == "OPTIONS":
+        return ("", 204)
+
     guard = admin_guard()
-    if guard: return guard
+    if guard:
+        return guard
+
     t = Training.query.get_or_404(id)
-    db.session.delete(t)
-    db.session.commit()
-    return jsonify({"message": "Training deleted successfully"})
+    try:
+        # Delete dependents first (raw bulk deletes = no UPDATE-to-NULL)
+        TrainingResult.query.filter_by(training_id=id).delete(synchronize_session=False)
+        Qualification.query.filter_by(training_id=id).delete(synchronize_session=False)
+        EOI.query.filter_by(training_id=id).delete(synchronize_session=False)
+
+        # Now delete the parent
+        db.session.delete(t)
+        db.session.commit()
+        return jsonify({"message": "Training deleted successfully"})
+    except IntegrityError as ie:
+        db.session.rollback()
+        return jsonify({"error": "Could not delete training due to related records", "detail": str(ie)}), 409
+    except Exception as e:
+        db.session.rollback()
+        print("[delete_training] unexpected error:", e)
+        return jsonify({"error": "Unexpected error deleting training", "detail": str(e)}), 500
+
+
+
+
 
 # --------------------------
 # Qualifications CRUD
